@@ -1,0 +1,9 @@
+build/
+dist/
+nbproject/private/
+out/
+.idea/
+.backups/
+.reporte_oculto/
+restaurante.db-shm
+restaurante.db-wal

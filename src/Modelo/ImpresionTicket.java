@@ -1,0 +1,264 @@
+package Modelo;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import javax.print.Doc;
+import javax.print.DocFlavor;
+import javax.print.DocPrintJob;
+import javax.print.PrintService;
+import javax.print.PrintServiceLookup;
+import javax.print.SimpleDoc;
+import javax.swing.JOptionPane;
+import javax.swing.JTable;
+
+public class ImpresionTicket {
+
+    private String rucRestaurante;
+    private String nombreRestaurante;
+    private String telefonoRestaurante;
+    private String direccionRestaurante;
+    private String mensajeRestaurante;
+    private String sala;
+    private int numMesa;
+    private String usuario;
+    private Conexion cn = new Conexion();
+    private PedidosDao pedidosDao = new PedidosDao();
+
+    // Método para formatear valores monetarios sin decimales si son enteros
+    private String formatearMoneda(double valor) {
+        if (valor == (long) valor) {
+            return String.format("COP %d", (long) valor); // Sin decimales si es entero
+        } else {
+            return String.format("COP %.2f", valor); // Con dos decimales si no es entero
+        }
+    }
+
+    public void datosRestaurante() {
+        String sql = "SELECT * FROM config WHERE id = 1";
+        try (Connection con = cn.getConnection(); PreparedStatement ps = con.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                rucRestaurante = rs.getString("ruc");
+                nombreRestaurante = rs.getString("nombre");
+                telefonoRestaurante = rs.getString("telefono");
+                direccionRestaurante = rs.getString("direccion");
+                mensajeRestaurante = rs.getString("mensaje");
+            }
+        } catch (SQLException e) {
+            System.out.println("Error al obtener datos del restaurante: " + e.getMessage());
+        }
+    }
+
+    public void datosPedido(int idPedido) {
+        String sql = "SELECT s.nombre AS sala, p.num_mesa, p.usuario FROM pedidos p "
+                + "INNER JOIN salas s ON p.id_sala = s.id WHERE p.id = ?";
+        try (Connection con = cn.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, idPedido);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    sala = rs.getString("sala");
+                    numMesa = rs.getInt("num_mesa");
+                    usuario = rs.getString("usuario");
+                } else {
+                    System.out.println("No se encontró el pedido con ID: " + idPedido);
+                    sala = "Desconocida";
+                    numMesa = 0;
+                    usuario = "Desconocido";
+                }
+            }
+        } catch (SQLException e) {
+            System.out.println("Error al obtener datos del pedido: " + e.getMessage());
+            sala = "Error";
+            numMesa = 0;
+            usuario = "Error";
+        }
+    }
+
+    public void imprimirTicket(int idPedido, JTable tableFinalizar) {
+        try {
+            datosRestaurante();
+            datosPedido(idPedido);
+            StringBuilder sb = new StringBuilder();
+            String fechaActual = new java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss").format(new java.util.Date());
+            double totalGeneral = 0.0;
+
+            // ENCABEZADO
+            sb.append(String.format("%s\n", centrarTexto(nombreRestaurante, 32)));
+            sb.append(String.format("NIT: %s\n", rucRestaurante));
+            sb.append(String.format("Tel: %s\n", telefonoRestaurante));
+            sb.append(String.format("Dir: %s\n", cortar(direccionRestaurante, 32)));
+            sb.append(String.format("Metodo de pago: %s\n", cortar(sala, 32)));
+            sb.append(String.format("Mesa: %d\n", numMesa));
+            sb.append("-----------------------------\n");
+            sb.append(String.format("Factura: %04d\n", idPedido));
+            sb.append(String.format("Fecha: %s\n", fechaActual));
+            sb.append("-----------------------------\n");
+
+            // PRODUCTOS
+            sb.append("Cant  Descripción          Total\n");
+            for (int i = 0; i < tableFinalizar.getRowCount(); i++) {
+                // Convertir la cantidad a entero
+                int cantidad;
+                try {
+                    Object valorCantidad = tableFinalizar.getValueAt(i, 2);
+                    if (valorCantidad instanceof Number) {
+                        cantidad = ((Number) valorCantidad).intValue();
+                    } else {
+                        cantidad = Integer.parseInt(valorCantidad.toString());
+                    }
+                    System.out.println("Fila " + i + ": Cantidad (entero) = " + cantidad); // Depuración
+                } catch (NumberFormatException e) {
+                    System.out.println("Error en cantidad en fila " + i + ": " + e.getMessage());
+                    continue;
+                }
+                String producto = tableFinalizar.getValueAt(i, 1).toString();
+                String total = tableFinalizar.getValueAt(i, 4).toString();
+                double totalItem = Double.parseDouble(total);
+                totalGeneral += totalItem;
+                sb.append(String.format("%-5d %-18s %6s\n", cantidad, cortar(producto, 18), formatearMoneda(totalItem)));
+            }
+            sb.append("-----------------------------\n");
+
+            // TOTAL
+            sb.append(String.format("TOTAL A PAGAR:      %s\n", formatearMoneda(totalGeneral)));
+            sb.append("-----------------------------\n");
+
+            // MENSAJE
+            sb.append("\n").append(cortar(mensajeRestaurante, 32)).append("\n");
+            sb.append("-----------------------------\n");
+            sb.append("¡Gracias por su visita!\n\n");
+
+            // COMANDO DE CORTE (ESC/POS)
+            byte[] corte = new byte[]{0x1D, 'V', 1};
+            byte[] datosTexto = sb.toString().getBytes("CP437");
+            byte[] datosFinal = new byte[datosTexto.length + corte.length];
+            System.arraycopy(datosTexto, 0, datosFinal, 0, datosTexto.length);
+            System.arraycopy(corte, 0, datosFinal, datosTexto.length, corte.length);
+
+            // ENVIAR A LA IMPRESORA
+            PrintService impresora = PrintServiceLookup.lookupDefaultPrintService();
+            if (impresora == null) {
+                JOptionPane.showMessageDialog(null, "No se encontró impresora predeterminada.");
+                return;
+            }
+
+            DocPrintJob job = impresora.createPrintJob();
+            Doc doc = new SimpleDoc(datosFinal, DocFlavor.BYTE_ARRAY.AUTOSENSE, null);
+            job.print(doc, null);
+
+            System.out.println("Ticket enviado a impresión para pedido ID: " + idPedido);
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Error al imprimir el ticket: " + e.getMessage());
+        }
+    }
+
+    public void imprimirTotalesDiariosMinimal() {
+        try {
+            // Determinar el rango de fechas
+            Calendar now = Calendar.getInstance();
+            Calendar inicio = (Calendar) now.clone();
+            Calendar fin = (Calendar) now.clone();
+            if (now.get(Calendar.HOUR_OF_DAY) < 4) {
+                inicio.add(Calendar.DAY_OF_MONTH, -1);
+                inicio.set(Calendar.HOUR_OF_DAY, 16);
+                inicio.set(Calendar.MINUTE, 0);
+                inicio.set(Calendar.SECOND, 0);
+                fin.set(Calendar.HOUR_OF_DAY, 4);
+                fin.set(Calendar.MINUTE, 0);
+                fin.set(Calendar.SECOND, 0);
+            } else {
+                inicio.set(Calendar.HOUR_OF_DAY, 16);
+                inicio.set(Calendar.MINUTE, 0);
+                inicio.set(Calendar.SECOND, 0);
+                fin.add(Calendar.DAY_OF_MONTH, 1);
+                fin.set(Calendar.HOUR_OF_DAY, 4);
+                fin.set(Calendar.MINUTE, 0);
+                fin.set(Calendar.SECOND, 0);
+            }
+            Timestamp fechaInicio = new Timestamp(inicio.getTimeInMillis());
+            Timestamp fechaFin = new Timestamp(fin.getTimeInMillis());
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+            System.out.println("🕓 Imprimiendo totales diarios minimalistas entre:");
+            System.out.println("   Desde: " + sdf.format(fechaInicio));
+            System.out.println("   Hasta: " + sdf.format(fechaFin));
+
+            // Calcular totales
+            double[] totales = pedidosDao.calcularTotalesDia(fechaInicio, fechaFin, 0);
+            double totalEfectivo = totales[0];
+            double totalTransaccion = totales[1];
+            double totalGeneral = 0.0;
+            String sqlTotal = "SELECT SUM(total) AS total FROM pedidos WHERE estado = 'FINALIZADO' AND fecha BETWEEN ? AND ?";
+            try (Connection con = cn.getConnection(); PreparedStatement ps = con.prepareStatement(sqlTotal)) {
+                ps.setString(1, new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(fechaInicio));
+                ps.setString(2, new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(fechaFin));
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        totalGeneral = rs.getDouble("total");
+                        if (rs.wasNull()) {
+                            totalGeneral = 0.0;
+                        }
+                    }
+                }
+            } catch (SQLException e) {
+                System.out.println("❌ Error al calcular total general: " + e.getMessage());
+                JOptionPane.showMessageDialog(null, "Error al calcular totales: " + e.getMessage());
+                return;
+            }
+
+            // Formatear el ticket minimalista
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format("Total Efectivo:    %s\n", formatearMoneda(totalEfectivo)));
+            sb.append(String.format("Total Transacción: %s\n", formatearMoneda(totalTransaccion)));
+            sb.append(String.format("Total General:     %s\n", formatearMoneda(totalGeneral)));
+            if (Math.abs((totalEfectivo + totalTransaccion) - totalGeneral) > 0.01) {
+                sb.append("Advertencia: Suma no coincide\n");
+            }
+            sb.append("\n"); // Espacio para el corte
+
+            // COMANDO DE CORTE (ESC/POS)
+            byte[] corte = new byte[]{0x1D, 'V', 1};
+            byte[] datosTexto = sb.toString().getBytes("CP437");
+            byte[] datosFinal = new byte[datosTexto.length + corte.length];
+            System.arraycopy(datosTexto, 0, datosFinal, 0, datosTexto.length);
+            System.arraycopy(corte, 0, datosFinal, datosTexto.length, corte.length);
+
+            // ENVIAR A LA IMPRESORA
+            PrintService impresora = PrintServiceLookup.lookupDefaultPrintService();
+            if (impresora == null) {
+                JOptionPane.showMessageDialog(null, "No se encontró impresora predeterminada.");
+                return;
+            }
+
+            DocPrintJob job = impresora.createPrintJob();
+            Doc doc = new SimpleDoc(datosFinal, DocFlavor.BYTE_ARRAY.AUTOSENSE, null);
+            job.print(doc, null);
+
+            System.out.println("✅ Ticket de totales diarios minimalista enviado a impresión");
+            JOptionPane.showMessageDialog(null, "Ticket de totales diarios impreso correctamente");
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("❌ Error al imprimir totales diarios minimalista: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Error al imprimir totales diarios: " + e.getMessage());
+        }
+    }
+
+    private String cortar(String texto, int max) {
+        if (texto == null) {
+            return "";
+        }
+        return texto.length() > max ? texto.substring(0, max - 1) + "." : texto;
+    }
+
+    private String centrarTexto(String texto, int ancho) {
+        if (texto == null) {
+            texto = "";
+        }
+        int espacios = (ancho - texto.length()) / 2;
+        return " ".repeat(Math.max(0, espacios)) + texto;
+    }
+}

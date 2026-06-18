@@ -40,16 +40,10 @@ public class AutoUpdater {
      */
     private static File detectAppRoot() {
         try {
-            String javaExePath = ProcessHandle.current().info().command().orElse("");
-            File javaExe = new File(javaExePath);
-            // Estructura jpackage: <AppRoot>/runtime/bin/java.exe → subir 3 niveles
-            File candidate = javaExe.getParentFile() != null
-                ? javaExe.getParentFile().getParentFile() != null
-                    ? javaExe.getParentFile().getParentFile().getParentFile()
-                    : null
-                : null;
-            if (candidate != null && new File(candidate, "app").exists()) {
-                return candidate;
+            File jarFile = new File(AutoUpdater.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            File parent = jarFile.getParentFile();
+            if (parent != null && parent.getName().equalsIgnoreCase("app")) {
+                return parent.getParentFile();
             }
         } catch (Exception e) {
             System.out.println("⚠️ No se pudo detectar appRoot: " + e.getMessage());

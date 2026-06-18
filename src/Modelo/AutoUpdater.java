@@ -6,7 +6,7 @@ import java.net.URL;
 
 public class AutoUpdater {
 
-    public static final String CURRENT_VERSION = "1.0.8";
+    public static final String CURRENT_VERSION = "1.0.9";
     private static final String VERSION_URL = "https://raw.githubusercontent.com/Alejopwn/Restaurante_comuneros-v3/main/version.txt";
 
     public interface UpdateProgressCallback {
@@ -39,7 +39,7 @@ public class AutoUpdater {
         try {
             if (callback != null) callback.onProgress("Buscando actualizaciones...", 10);
             
-            URL url = new URL(VERSION_URL);
+            URL url = new URL(VERSION_URL + "?t=" + System.currentTimeMillis());
             conn = (HttpURLConnection) url.openConnection();
             conn.setConnectTimeout(3000);
             conn.setReadTimeout(3000);

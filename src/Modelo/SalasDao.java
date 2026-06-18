@@ -9,53 +9,28 @@ import java.util.List;
 
 public class SalasDao {
 
-    // Connection con;
     Conexion cn = new Conexion();
-    // PreparedStatement ps;
-    // ResultSet rs;
 
     public boolean RegistrarSala(Salas sl) {
-        Connection con = null;
-        PreparedStatement ps = null;
-        ResultSet rs = null;
         String sql = "INSERT INTO salas(nombre, mesas) VALUES (?,?)";
-
-        boolean var4;
-        try {
-            con = this.cn.getConnection();
-            ps = con.prepareStatement(sql);
+        try (Connection con = cn.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setString(1, sl.getNombre());
             ps.setInt(2, sl.getMesas());
             ps.execute();
-            boolean var3 = true;
-            return var3;
-        } catch (SQLException var14) {
-            System.out.println(var14.toString());
-            var4 = false;
-        } finally {
-            try {
-                con.close();
-            } catch (SQLException var13) {
-                System.out.println(var13.toString());
-            }
-
+            return true;
+        } catch (SQLException e) {
+            System.out.println("Error al registrar sala: " + e.toString());
+            return false;
         }
-
-        return var4;
     }
 
-    public List Listar() {
-        Connection con = null;
-        PreparedStatement ps = null;
-        ResultSet rs = null;
-        List Lista = new ArrayList();
+    public List<Salas> Listar() {
+        List<Salas> Lista = new ArrayList<>();
         String sql = "SELECT * FROM salas";
-
-        try {
-            con = this.cn.getConnection();
-            ps = con.prepareStatement(sql);
-            rs = ps.executeQuery();
-
+        try (Connection con = cn.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 Salas sl = new Salas();
                 sl.setId(rs.getInt("id"));
@@ -63,106 +38,53 @@ public class SalasDao {
                 sl.setMesas(rs.getInt("mesas"));
                 Lista.add(sl);
             }
-        } catch (SQLException var4) {
-            System.out.println(var4.toString());
+        } catch (SQLException e) {
+            System.out.println("Error al listar salas: " + e.toString());
         }
-
         return Lista;
     }
 
     public boolean Eliminar(int id) {
-        Connection con = null;
-        PreparedStatement ps = null;
-        ResultSet rs = null;
         String sql = "DELETE FROM salas WHERE id = ? ";
-
-        boolean var4;
-        try {
-            con = this.cn.getConnection();
-            ps = con.prepareStatement(sql);
+        try (Connection con = cn.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, id);
             ps.execute();
-            boolean var3 = true;
-            return var3;
-        } catch (SQLException var14) {
-            System.out.println(var14.toString());
-            var4 = false;
-        } finally {
-            try {
-                con.close();
-            } catch (SQLException var13) {
-                System.out.println(var13.toString());
-            }
-
+            return true;
+        } catch (SQLException e) {
+            System.out.println("Error al eliminar sala: " + e.toString());
+            return false;
         }
-
-        return var4;
     }
 
     public boolean Modificar(Salas sl) {
-        Connection con = null;
-        PreparedStatement ps = null;
-        ResultSet rs = null;
         String sql = "UPDATE salas SET nombre=?, mesas=? WHERE id=?";
-
-        boolean var4;
-        try {
-            con = this.cn.getConnection();
-            ps = con.prepareStatement(sql);
+        try (Connection con = cn.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setString(1, sl.getNombre());
             ps.setInt(2, sl.getMesas());
             ps.setInt(3, sl.getId());
             ps.execute();
-            boolean var3 = true;
-            return var3;
-        } catch (SQLException var14) {
-            System.out.println(var14.toString());
-            var4 = false;
-        } finally {
-            try {
-                con.close();
-            } catch (SQLException var13) {
-                System.out.println(var13.toString());
-            }
-
+            return true;
+        } catch (SQLException e) {
+            System.out.println("Error al modificar sala: " + e.toString());
+            return false;
         }
-
-        return var4;
     }
 
-    // En SalasDao.java
     public int buscarIdSalaPorNombre(String nombre) {
-        Connection con = null;
-        PreparedStatement ps = null;
-        ResultSet rs = null;
         String sql = "SELECT id FROM salas WHERE nombre = ?";
-        int idSala = 0;
-        try {
-            con = cn.getConnection();
-            ps = con.prepareStatement(sql);
+        try (Connection con = cn.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setString(1, nombre);
-            rs = ps.executeQuery();
-            if (rs.next()) {
-                idSala = rs.getInt("id");
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("id");
+                }
             }
         } catch (SQLException e) {
-            System.out.println(e.toString());
-        } finally {
-            try {
-                if (rs != null) {
-                    rs.close();
-                }
-                if (ps != null) {
-                    ps.close();
-                }
-                if (con != null) {
-                    con.close();
-                }
-            } catch (SQLException e) {
-                System.out.println(e.toString());
-            }
+            System.out.println("Error al buscar id de sala por nombre: " + e.toString());
         }
-        return idSala;
+        return 0;
     }
-
 }

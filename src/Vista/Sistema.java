@@ -1686,7 +1686,6 @@ public final class Sistema extends javax.swing.JFrame {
 
     private void btnSalaActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSalaActionPerformed
         // TODO add your handling code here:
-        LimpiarTable();
         ListarSalas();
         LimpiarTableMenu();
         LimpiarPlatos();
@@ -1719,7 +1718,6 @@ public final class Sistema extends javax.swing.JFrame {
 
     private void btnUsuariosActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnUsuariosActionPerformed
         // TODO add your handling code here:
-        LimpiarTable();
         ListarUsuarios();
         LimpiarTableMenu();
         LimpiarPlatos();
@@ -2486,13 +2484,17 @@ public final class Sistema extends javax.swing.JFrame {
     private void btnEliminarSalaActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEliminarSalaActionPerformed
         // TODO add your handling code here:
         if (!"".equals(txtIdSala.getText())) {
-            int pregunta = JOptionPane.showConfirmDialog(null, "Esta seguro de eliminar");
-            if (pregunta == 0) {
+            int pregunta = JOptionPane.showConfirmDialog(null, "¿Está seguro de eliminar esta sala?", "Confirmar eliminación", JOptionPane.YES_NO_OPTION);
+            if (pregunta == JOptionPane.YES_OPTION) {
                 int id = Integer.parseInt(txtIdSala.getText());
-                slDao.Eliminar(id);
-                LimpiarSala();
-                LimpiarTable();
-                ListarSalas();
+                boolean eliminado = slDao.Eliminar(id);
+                if (eliminado) {
+                    JOptionPane.showMessageDialog(null, "Sala eliminada correctamente");
+                    LimpiarSala();
+                    ListarSalas();
+                } else {
+                    JOptionPane.showMessageDialog(null, "No se puede eliminar la sala. Asegúrese de que no tenga pedidos asociados.", "Error", JOptionPane.ERROR_MESSAGE);
+                }
             }
         } else {
             JOptionPane.showMessageDialog(null, "Seleccione una fila");
@@ -2516,7 +2518,6 @@ public final class Sistema extends javax.swing.JFrame {
                     slDao.Modificar(sl);
                     JOptionPane.showMessageDialog(null, "Sala actualizada correctamente");
                     LimpiarSala();
-                    LimpiarTable();
                     ListarSalas();
                 } catch (NumberFormatException e) {
                     JOptionPane.showMessageDialog(null, "El número de mesas debe ser un entero válido");
@@ -2541,7 +2542,6 @@ public final class Sistema extends javax.swing.JFrame {
             mostrarExitoEnBoton(btnRegistrarSala, "REGISTRAR", "✅ Registrado");
 
             LimpiarSala();
-            LimpiarTable();
             ListarSalas();
         } catch (NumberFormatException e) {
             JOptionPane.showMessageDialog(null, "El número de mesas debe ser un entero válido");
@@ -3161,6 +3161,7 @@ public final class Sistema extends javax.swing.JFrame {
     private void ListarUsuarios() {
         List<login> Listar = lgDao.ListarUsuarios();
         modelo = (DefaultTableModel) TableUsuarios.getModel();
+        modelo.setRowCount(0);
         Object[] ob = new Object[4];
         for (int i = 0; i < Listar.size(); i++) {
             ob[0] = Listar.get(i).getId();
@@ -3175,6 +3176,7 @@ public final class Sistema extends javax.swing.JFrame {
     private void ListarSalas() {
         List<Salas> Listar = slDao.Listar();
         modelo = (DefaultTableModel) tableSala.getModel();
+        modelo.setRowCount(0);
         Object[] ob = new Object[3];
         for (int i = 0; i < Listar.size(); i++) {
             ob[0] = Listar.get(i).getId();
@@ -3183,7 +3185,6 @@ public final class Sistema extends javax.swing.JFrame {
             modelo.addRow(ob);
         }
         colorHeader(tableSala);
-
     }
 
     private void colorHeader(JTable tabla) {

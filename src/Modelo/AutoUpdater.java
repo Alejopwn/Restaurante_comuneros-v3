@@ -6,7 +6,7 @@ import java.net.URL;
 
 public class AutoUpdater {
 
-    public static final String CURRENT_VERSION = "1.1.2";
+    public static final String CURRENT_VERSION = "1.1.3";
     private static final String VERSION_URL = "https://raw.githubusercontent.com/Alejopwn/Restaurante_comuneros-v3/main/version.txt";
 
     public interface UpdateProgressCallback {
@@ -170,34 +170,47 @@ public class AutoUpdater {
         System.out.println("🔍 Archivo temporal: " + tempJar.getAbsolutePath());
 
         try {
-            if (os.contains("win")) {
-                File batFile = new File(workDir, "update.bat");
+                // Usar VBScript en vez de .bat para mayor fiabilidad en Windows
+                File vbsFile = new File(workDir, "update.vbs");
                 File logFile = new File(workDir, "update_log.txt");
-                PrintWriter writer = new PrintWriter(new FileWriter(batFile));
-                writer.println("@echo off");
-                writer.println("echo [LOG] Iniciando proceso de actualizacion... > \"" + logFile.getAbsolutePath() + "\"");
-                writer.println("echo [LOG] Esperando cierre completo de la JVM... >> \"" + logFile.getAbsolutePath() + "\"");
-                writer.println("ping 127.0.0.1 -n 6 > nul");
-                writer.println("echo [LOG] Reemplazando JAR... >> \"" + logFile.getAbsolutePath() + "\"");
+                String jarDest, exePath;
 
                 if (isPackaged) {
-                    String jarDest = new File(appRoot, "app\\Restaurante_comuneros.jar").getAbsolutePath();
-                    String exePath = new File(appRoot, "Comuneros.exe").getAbsolutePath();
-                    writer.println("move /y \"" + tempJar.getAbsolutePath() + "\" \"" + jarDest + "\" >> \"" + logFile.getAbsolutePath() + "\" 2>&1");
-                    writer.println("echo [LOG] Reiniciando... >> \"" + logFile.getAbsolutePath() + "\"");
-                    writer.println("start \"\" \"" + exePath + "\"");
+                    jarDest = new File(appRoot, "app\\Restaurante_comuneros.jar").getAbsolutePath();
+                    exePath  = new File(appRoot, "Comuneros.exe").getAbsolutePath();
                 } else {
-                    writer.println("move /y \"" + tempJar.getAbsolutePath() + "\" dist\\Restaurante_comuneros.jar >> \"" + logFile.getAbsolutePath() + "\" 2>&1");
-                    writer.println("start \"\" java -cp \"dist\\Restaurante_comuneros.jar;librerias\\*\" restaurante.Restaurante");
+                    jarDest = new File(workDir, "dist\\Restaurante_comuneros.jar").getAbsolutePath();
+                    exePath  = ""; // modo dev: no hay .exe
                 }
 
-                writer.println("echo [LOG] Listo. >> \"" + logFile.getAbsolutePath() + "\"");
-                writer.println("del \"%~f0\"");
+                PrintWriter writer = new PrintWriter(new FileWriter(vbsFile));
+                writer.println("' Script de actualizacion automatica - Comuneros POS");
+                writer.println("WScript.Sleep 5000");
+                writer.println("Dim fso, shell");
+                writer.println("Set fso   = CreateObject(\"Scripting.FileSystemObject\")");
+                writer.println("Set shell = CreateObject(\"WScript.Shell\")");
+                writer.println("Dim log : log = \"" + logFile.getAbsolutePath() + "\"");
+                writer.println("Dim tmp : tmp = \"" + tempJar.getAbsolutePath() + "\"");
+                writer.println("Dim dst : dst = \"" + jarDest + "\"");
+                writer.println("On Error Resume Next");
+                writer.println("fso.CopyFile tmp, dst, True");
+                writer.println("If Err.Number <> 0 Then");
+                writer.println("  shell.Run \"cmd /c echo [ERROR] \" & Err.Description & \" >> \" & Chr(34) & log & Chr(34), 0, False");
+                writer.println("Else");
+                writer.println("  fso.DeleteFile tmp");
+                writer.println("  shell.Run \"cmd /c echo [OK] JAR reemplazado >> \" & Chr(34) & log & Chr(34), 0, False");
+                if (isPackaged) {
+                    writer.println("  shell.Run Chr(34) & \"" + exePath + "\" & Chr(34), 1, False");
+                } else {
+                    writer.println("  shell.Run \"java -cp dist\\\\Restaurante_comuneros.jar;librerias\\\\* restaurante.Restaurante\", 1, False");
+                }
+                writer.println("End If");
+                writer.println("fso.DeleteFile WScript.ScriptFullName");
                 writer.close();
 
-                // Lanzar el bat desacoplado de la JVM con start /b
+                // Lanzar el VBScript con wscript.exe (sin ventana de consola)
                 Runtime.getRuntime().exec(new String[]{
-                    "cmd.exe", "/c", "start", "/b", "", batFile.getAbsolutePath()
+                    "wscript.exe", "//Nologo", vbsFile.getAbsolutePath()
                 });
             } else {
                 File shFile = new File(workDir, "update.sh");

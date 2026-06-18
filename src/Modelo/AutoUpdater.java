@@ -143,7 +143,7 @@ public class AutoUpdater {
                 : null;
             
             boolean isPackaged = appRoot != null && new File(appRoot, "app").exists();
-            String appRootPath = appRoot != null ? appRoot.getAbsolutePath() : ".";
+            String appRootPath = isPackaged ? appRoot.getAbsolutePath() : ".";
             
             System.out.println("🔍 Ruta raíz detectada: " + appRootPath);
             System.out.println("🔍 ¿Modo portable (jpackage)? " + isPackaged);
@@ -177,7 +177,7 @@ public class AutoUpdater {
                 
                 // Ejecutar el script usando ProcessBuilder de forma robusta
                 ProcessBuilder pb = new ProcessBuilder("cmd.exe", "/c", batFile.getName());
-                pb.directory(appRoot != null ? appRoot : new File("."));
+                pb.directory(isPackaged ? appRoot : new File("."));
                 pb.start();
             } else {
                 File shFile = new File(appRootPath, "update.sh");
@@ -188,10 +188,10 @@ public class AutoUpdater {
                 
                 if (isPackaged) {
                     writer.println("mv \"" + appRootPath + "/update.tmp\" \"" + appRootPath + "/app/Restaurante_comuneros.jar\" >> update_log.txt 2>&1");
-                    writer.println("\"" + appRootPath + "/Comuneros\" &");
+                    writer.println("\"" + appRootPath + "/Comuneros\" >> update_log.txt 2>&1 &");
                 } else {
                     writer.println("mv update.tmp dist/Restaurante_comuneros.jar >> update_log.txt 2>&1");
-                    writer.println("java -cp \"dist/Restaurante_comuneros.jar:librerias/*\" restaurante.Restaurante &");
+                    writer.println("java -cp \"dist/Restaurante_comuneros.jar:librerias/*\" restaurante.Restaurante >> update_log.txt 2>&1 &");
                 }
                 
                 writer.println("rm -- \"$0\"");
@@ -199,7 +199,7 @@ public class AutoUpdater {
                 
                 shFile.setExecutable(true);
                 ProcessBuilder pb = new ProcessBuilder("/bin/sh", shFile.getName());
-                pb.directory(appRoot != null ? appRoot : new File("."));
+                pb.directory(isPackaged ? appRoot : new File("."));
                 pb.start();
             }
             

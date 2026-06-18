@@ -6,7 +6,7 @@ import java.net.URL;
 
 public class AutoUpdater {
 
-    public static final String CURRENT_VERSION = "1.1.1";
+    public static final String CURRENT_VERSION = "1.1.2";
     private static final String VERSION_URL = "https://raw.githubusercontent.com/Alejopwn/Restaurante_comuneros-v3/main/version.txt";
 
     public interface UpdateProgressCallback {
@@ -195,9 +195,10 @@ public class AutoUpdater {
                 writer.println("del \"%~f0\"");
                 writer.close();
 
-                ProcessBuilder pb = new ProcessBuilder("cmd.exe", "/c", batFile.getAbsolutePath());
-                pb.directory(workDir);
-                pb.start();
+                // Lanzar el bat desacoplado de la JVM con start /b
+                Runtime.getRuntime().exec(new String[]{
+                    "cmd.exe", "/c", "start", "/b", "", batFile.getAbsolutePath()
+                });
             } else {
                 File shFile = new File(workDir, "update.sh");
                 File logFile = new File(workDir, "update_log.txt");
@@ -220,15 +221,15 @@ public class AutoUpdater {
                 writer.close();
                 shFile.setExecutable(true);
 
-                ProcessBuilder pb = new ProcessBuilder("/bin/sh", shFile.getAbsolutePath());
-                pb.directory(workDir);
-                pb.start();
+                Runtime.getRuntime().exec(new String[]{"/bin/sh", shFile.getAbsolutePath()});
             }
 
             System.out.println("🔄 Script lanzado. Cerrando JVM...");
-            System.exit(0);
         } catch (Exception e) {
             System.out.println("❌ Error al lanzar el actualizador externo: " + e.getMessage());
+        } finally {
+            // Siempre cerrar la JVM para liberar el bloqueo del JAR
+            System.exit(0);
         }
     }
 }

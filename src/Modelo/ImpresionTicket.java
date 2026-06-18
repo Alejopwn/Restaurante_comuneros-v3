@@ -99,7 +99,7 @@ public class ImpresionTicket {
             sb.append(String.format("NIT: %s\n", rucRestaurante));
             sb.append(String.format("Tel: %s\n", telefonoRestaurante));
             sb.append(String.format("Dir: %s\n", cortar(direccionRestaurante, 32)));
-            sb.append(String.format("Metodo de pago: %s\n", cortar(sala, 32)));
+            sb.append(String.format("Sala: %s\n", cortar(sala, 32)));
             sb.append(String.format("Mesa: %d\n", numMesa));
             sb.append("-----------------------------\n");
             sb.append(String.format("Factura: %04d\n", idPedido));
@@ -128,6 +128,11 @@ public class ImpresionTicket {
                 double totalItem = Double.parseDouble(total);
                 totalGeneral += totalItem;
                 sb.append(String.format("%-5d %-18s %6s\n", cantidad, cortar(producto, 18), formatearMoneda(totalItem)));
+                // Imprimir comentario si existe
+                Object comentarioObj = tableFinalizar.getValueAt(i, 5);
+                if (comentarioObj != null && !comentarioObj.toString().trim().isEmpty()) {
+                    sb.append(String.format("  >> %s\n", cortar(comentarioObj.toString().trim(), 28)));
+                }
             }
             sb.append("-----------------------------\n");
 

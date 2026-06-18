@@ -305,10 +305,10 @@ public class PedidosDao {
             doc.add(Chunk.NEWLINE);
 
             // Tabla de productos
-            PdfPTable tabla = new PdfPTable(4);
+            PdfPTable tabla = new PdfPTable(5);
             tabla.setWidthPercentage(100);
             tabla.getDefaultCell().setBorder(0);
-            float[] columnWidths = new float[]{10f, 50f, 15f, 15f};
+            float[] columnWidths = new float[]{8f, 35f, 15f, 15f, 27f};
             tabla.setWidths(columnWidths);
             tabla.setHorizontalAlignment(0);
 
@@ -316,30 +316,47 @@ public class PedidosDao {
             PdfPCell c2 = new PdfPCell(new Phrase("Plato.", negrita));
             PdfPCell c3 = new PdfPCell(new Phrase("P. unt.", negrita));
             PdfPCell c4 = new PdfPCell(new Phrase("P. Total", negrita));
+            PdfPCell c5 = new PdfPCell(new Phrase("Comentario", negrita));
             c1.setBorder(0);
             c2.setBorder(0);
             c3.setBorder(0);
             c4.setBorder(0);
+            c5.setBorder(0);
             c1.setBackgroundColor(BaseColor.LIGHT_GRAY);
             c2.setBackgroundColor(BaseColor.LIGHT_GRAY);
             c3.setBackgroundColor(BaseColor.LIGHT_GRAY);
             c4.setBackgroundColor(BaseColor.LIGHT_GRAY);
+            c5.setBackgroundColor(BaseColor.LIGHT_GRAY);
             tabla.addCell(c1);
             tabla.addCell(c2);
             tabla.addCell(c3);
             tabla.addCell(c4);
+            tabla.addCell(c5);
 
             String product = "SELECT d.* FROM pedidos p INNER JOIN detalle_pedidos d ON p.id = d.id_pedido WHERE p.id = ?";
             try {
                 ps = con.prepareStatement(product);
                 ps.setInt(1, id_pedido);
                 rs = ps.executeQuery();
+                Font comentFont = new Font(Font.FontFamily.TIMES_ROMAN, 9, Font.ITALIC, BaseColor.DARK_GRAY);
                 while (rs.next()) {
                     double subTotal = rs.getInt("cantidad") * rs.getDouble("precio");
                     tabla.addCell(rs.getString("cantidad"));
                     tabla.addCell(rs.getString("nombre"));
                     tabla.addCell(String.format("%.2f COP", rs.getDouble("precio")));
                     tabla.addCell(String.format("%.2f COP", subTotal));
+                    // Columna de comentario
+                    String comentario = rs.getString("comentario");
+                    if (comentario != null && !comentario.trim().isEmpty()) {
+                        PdfPCell commentCell = new PdfPCell(new Phrase(comentario.trim(), comentFont));
+                        commentCell.setBorder(0);
+                        commentCell.setBackgroundColor(new BaseColor(255, 255, 204));
+                        tabla.addCell(commentCell);
+                    } else {
+                        PdfPCell emptyCell = new PdfPCell(new Phrase(""));
+                        emptyCell.setBorder(0);
+                        tabla.addCell(emptyCell);
+                    }
                 }
             } catch (SQLException e) {
                 System.out.println("Error al obtener detalles del pedido: " + e.toString());

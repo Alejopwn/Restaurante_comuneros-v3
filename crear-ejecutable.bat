@@ -6,19 +6,19 @@ echo =======================================================
 echo.
 
 :: Verificar si Java está instalado y en el PATH
-where java >nul 2>nul
+java -version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [ERROR] No se encontro Java instalado o no esta en las variables de entorno.
-    echo Por favor instale JDK 17 o superior para continuar.
+    echo [ERROR] No se encontro Java instalado o no esta en las variables de entorno (PATH).
+    echo Por favor, instale JDK 17 o superior y asegurese de agregarlo al PATH.
     pause
     exit /b
 )
 
 :: Verificar si jpackage está disponible
-where jpackage >nul 2>nul
+jpackage --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] No se encontro la herramienta 'jpackage'. 
-    echo Asegurese de estar usando un JDK completo (version 17 o superior).
+    echo Asegurese de estar usando un JDK completo (version 17 o superior) y que este en el PATH.
     pause
     exit /b
 )

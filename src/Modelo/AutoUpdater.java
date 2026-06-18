@@ -34,11 +34,41 @@ public class AutoUpdater {
         return false;
     }
 
+    /**
+     * Detecta la carpeta raíz de la aplicación portátil (jpackage).
+     * Si no está en modo portátil, devuelve null.
+     */
+    private static File detectAppRoot() {
+        try {
+            String javaExePath = ProcessHandle.current().info().command().orElse("");
+            File javaExe = new File(javaExePath);
+            // Estructura jpackage: <AppRoot>/runtime/bin/java.exe → subir 3 niveles
+            File candidate = javaExe.getParentFile() != null
+                ? javaExe.getParentFile().getParentFile() != null
+                    ? javaExe.getParentFile().getParentFile().getParentFile()
+                    : null
+                : null;
+            if (candidate != null && new File(candidate, "app").exists()) {
+                return candidate;
+            }
+        } catch (Exception e) {
+            System.out.println("⚠️ No se pudo detectar appRoot: " + e.getMessage());
+        }
+        return null;
+    }
+
     public static boolean checkAndApply(UpdateProgressCallback callback) {
         HttpURLConnection conn = null;
         try {
             if (callback != null) callback.onProgress("Buscando actualizaciones...", 10);
-            
+
+            // Detectar ruta raíz UNA SOLA VEZ para todo el proceso
+            File appRoot = detectAppRoot();
+            boolean isPackaged = appRoot != null;
+            File workDir = isPackaged ? appRoot : new File(".");
+            System.out.println("🔍 Directorio de trabajo: " + workDir.getAbsolutePath());
+            System.out.println("🔍 ¿Modo portable? " + isPackaged);
+
             URL url = new URL(VERSION_URL + "?t=" + System.currentTimeMillis());
             conn = (HttpURLConnection) url.openConnection();
             conn.setConnectTimeout(3000);
@@ -68,13 +98,13 @@ public class AutoUpdater {
             if (isNewerVersion(CURRENT_VERSION, remoteVersion)) {
                 if (callback != null) callback.onProgress("¡Actualización encontrada (" + remoteVersion + ")!", 30);
                 
-                // Descargar el nuevo JAR como archivo temporal
-                File tempJar = new File("update.tmp");
+                // Descargar en ruta ABSOLUTA dentro de la carpeta de la app
+                File tempJar = new File(workDir, "update.tmp");
+                System.out.println("📥 Descargando en: " + tempJar.getAbsolutePath());
+                
                 if (downloadFile(downloadUrl, tempJar, callback)) {
                     if (callback != null) callback.onProgress("Preparando reinicio...", 95);
-                    
-                    // Lanzar el script del sistema y salir
-                    launchUpdaterScript();
+                    launchUpdaterScript(appRoot, tempJar);
                     return true;
                 }
             } else {
@@ -130,80 +160,72 @@ public class AutoUpdater {
         return false;
     }
 
-    private static void launchUpdaterScript() {
+    private static void launchUpdaterScript(File appRoot, File tempJar) {
         String os = System.getProperty("os.name").toLowerCase();
-        try {
-            // Obtener la ruta absoluta del ejecutable actual de la JVM
-            String javaExePath = ProcessHandle.current().info().command().orElse("");
-            File javaExe = new File(javaExePath);
-            File appRoot = javaExe.getParentFile() != null
-                ? javaExe.getParentFile().getParentFile() != null
-                    ? javaExe.getParentFile().getParentFile().getParentFile()
-                    : null
-                : null;
-            
-            boolean isPackaged = appRoot != null && new File(appRoot, "app").exists();
-            String appRootPath = isPackaged ? appRoot.getAbsolutePath() : ".";
-            
-            System.out.println("🔍 Ruta raíz detectada: " + appRootPath);
-            System.out.println("🔍 ¿Modo portable (jpackage)? " + isPackaged);
+        boolean isPackaged = appRoot != null;
+        File workDir = isPackaged ? appRoot : new File(".");
+        String appRootPath = workDir.getAbsolutePath();
 
+        System.out.println("🔍 Ruta raíz del instalador: " + appRootPath);
+        System.out.println("🔍 Archivo temporal: " + tempJar.getAbsolutePath());
+
+        try {
             if (os.contains("win")) {
-                File batFile = new File(appRootPath, "update.bat");
+                File batFile = new File(workDir, "update.bat");
+                File logFile = new File(workDir, "update_log.txt");
                 PrintWriter writer = new PrintWriter(new FileWriter(batFile));
                 writer.println("@echo off");
-                writer.println("echo [LOG] Iniciando proceso de actualizacion... > update_log.txt");
-                writer.println("echo [LOG] Esperando a que el sistema POS se cierre por completo... >> update_log.txt");
-                // Esperar 5 segundos (6 pings) para asegurar que el proceso Java liberó el JAR
+                writer.println("echo [LOG] Iniciando proceso de actualizacion... > \"" + logFile.getAbsolutePath() + "\"");
+                writer.println("echo [LOG] Esperando cierre completo de la JVM... >> \"" + logFile.getAbsolutePath() + "\"");
                 writer.println("ping 127.0.0.1 -n 6 > nul");
-                writer.println("echo [LOG] Reemplazando JAR de la aplicacion... >> update_log.txt");
-                
+                writer.println("echo [LOG] Reemplazando JAR... >> \"" + logFile.getAbsolutePath() + "\"");
+
                 if (isPackaged) {
                     String jarDest = new File(appRoot, "app\\Restaurante_comuneros.jar").getAbsolutePath();
-                    String tmpSrc  = new File(appRootPath, "update.tmp").getAbsolutePath();
-                    String exePath = new File(appRootPath, "Comuneros.exe").getAbsolutePath();
-                    writer.println("move /y \"" + tmpSrc + "\" \"" + jarDest + "\" >> update_log.txt 2>&1");
-                    writer.println("echo [LOG] Reiniciando la aplicacion portable... >> update_log.txt");
-                    writer.println("start \"\" \"" + exePath + "\" >> update_log.txt 2>&1");
+                    String exePath = new File(appRoot, "Comuneros.exe").getAbsolutePath();
+                    writer.println("move /y \"" + tempJar.getAbsolutePath() + "\" \"" + jarDest + "\" >> \"" + logFile.getAbsolutePath() + "\" 2>&1");
+                    writer.println("echo [LOG] Reiniciando... >> \"" + logFile.getAbsolutePath() + "\"");
+                    writer.println("start \"\" \"" + exePath + "\"");
                 } else {
-                    writer.println("move /y update.tmp dist\\Restaurante_comuneros.jar >> update_log.txt 2>&1");
-                    writer.println("echo [LOG] Reiniciando la aplicacion en modo desarrollo... >> update_log.txt");
-                    writer.println("start \"\" java -cp \"dist\\Restaurante_comuneros.jar;librerias\\*\" restaurante.Restaurante >> update_log.txt 2>&1");
+                    writer.println("move /y \"" + tempJar.getAbsolutePath() + "\" dist\\Restaurante_comuneros.jar >> \"" + logFile.getAbsolutePath() + "\" 2>&1");
+                    writer.println("start \"\" java -cp \"dist\\Restaurante_comuneros.jar;librerias\\*\" restaurante.Restaurante");
                 }
-                
-                writer.println("echo [LOG] Actualizacion completada. >> update_log.txt");
+
+                writer.println("echo [LOG] Listo. >> \"" + logFile.getAbsolutePath() + "\"");
                 writer.println("del \"%~f0\"");
                 writer.close();
-                
-                // Ejecutar el script usando ProcessBuilder de forma robusta
-                ProcessBuilder pb = new ProcessBuilder("cmd.exe", "/c", batFile.getName());
-                pb.directory(isPackaged ? appRoot : new File("."));
+
+                ProcessBuilder pb = new ProcessBuilder("cmd.exe", "/c", batFile.getAbsolutePath());
+                pb.directory(workDir);
                 pb.start();
             } else {
-                File shFile = new File(appRootPath, "update.sh");
+                File shFile = new File(workDir, "update.sh");
+                File logFile = new File(workDir, "update_log.txt");
                 PrintWriter writer = new PrintWriter(new FileWriter(shFile));
                 writer.println("#!/bin/sh");
-                writer.println("echo \"[LOG] Iniciando actualizacion...\" > update_log.txt");
+                writer.println("echo \"[LOG] Iniciando actualizacion...\" > \"" + logFile.getAbsolutePath() + "\"");
                 writer.println("sleep 4");
-                
+
                 if (isPackaged) {
-                    writer.println("mv \"" + appRootPath + "/update.tmp\" \"" + appRootPath + "/app/Restaurante_comuneros.jar\" >> update_log.txt 2>&1");
-                    writer.println("\"" + appRootPath + "/Comuneros\" >> update_log.txt 2>&1 &");
+                    String jarDest = new File(appRoot, "app/Restaurante_comuneros.jar").getAbsolutePath();
+                    String exePath = new File(appRoot, "Comuneros").getAbsolutePath();
+                    writer.println("mv \"" + tempJar.getAbsolutePath() + "\" \"" + jarDest + "\" >> \"" + logFile.getAbsolutePath() + "\" 2>&1");
+                    writer.println("\"" + exePath + "\" &");
                 } else {
-                    writer.println("mv update.tmp dist/Restaurante_comuneros.jar >> update_log.txt 2>&1");
-                    writer.println("java -cp \"dist/Restaurante_comuneros.jar:librerias/*\" restaurante.Restaurante >> update_log.txt 2>&1 &");
+                    writer.println("mv \"" + tempJar.getAbsolutePath() + "\" dist/Restaurante_comuneros.jar >> \"" + logFile.getAbsolutePath() + "\" 2>&1");
+                    writer.println("java -cp \"dist/Restaurante_comuneros.jar:librerias/*\" restaurante.Restaurante &");
                 }
-                
+
                 writer.println("rm -- \"$0\"");
                 writer.close();
-                
                 shFile.setExecutable(true);
-                ProcessBuilder pb = new ProcessBuilder("/bin/sh", shFile.getName());
-                pb.directory(isPackaged ? appRoot : new File("."));
+
+                ProcessBuilder pb = new ProcessBuilder("/bin/sh", shFile.getAbsolutePath());
+                pb.directory(workDir);
                 pb.start();
             }
-            
-            System.out.println("🔄 Lanzando instalador en segundo plano y cerrando JVM...");
+
+            System.out.println("🔄 Script lanzado. Cerrando JVM...");
             System.exit(0);
         } catch (Exception e) {
             System.out.println("❌ Error al lanzar el actualizador externo: " + e.getMessage());

@@ -21,6 +21,11 @@ copy librerias\*.jar package-temp\
 echo [+] Compilando aplicacion nativa con JRE integrado...
 jpackage --type app-image --name "Comuneros" --input package-temp --main-jar Restaurante_comuneros.jar --main-class restaurante.Restaurante --dest Comuneros-POS
 
+echo [+] Copiando base de datos activa al ejecutable...
+if exist restaurante.db (
+    copy restaurante.db Comuneros-POS\Comuneros\ > nul
+)
+
 echo.
 echo =======================================================
 echo  [OK] Proceso de empaquetado finalizado.

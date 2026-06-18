@@ -104,7 +104,7 @@ public class FrmLogin extends javax.swing.JFrame {
         lblLogo.setBounds(0, 185, 290, 40);
         panelLeft.add(lblLogo);
 
-        lblSubtitle = new JLabel("Puente Nacional");
+        lblSubtitle = new JLabel("Puente Nacional (v1.1.5 Actualizado)");
         lblSubtitle.setFont(Sistema.getFontRegular(15f));
         lblSubtitle.setForeground(new Color(147, 197, 253));
         lblSubtitle.setHorizontalAlignment(SwingConstants.CENTER);

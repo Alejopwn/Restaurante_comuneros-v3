@@ -134,28 +134,47 @@ public class AutoUpdater {
         String os = System.getProperty("os.name").toLowerCase();
         try {
             if (os.contains("win")) {
-                // Generar script .bat para Windows
+                // Verificar si se está ejecutando desde la versión portable (.exe)
+                boolean isPackaged = new File("Comuneros.exe").exists() && new File("app").exists();
+                
                 File batFile = new File("update.bat");
                 PrintWriter writer = new PrintWriter(new FileWriter(batFile));
                 writer.println("@echo off");
                 writer.println("echo Esperando a que el sistema POS se cierre...");
                 writer.println("ping 127.0.0.1 -n 3 > nul");
                 writer.println("echo Aplicando actualizacion...");
-                writer.println("move /y update.tmp dist\\Restaurante_comuneros.jar > nul");
-                writer.println("echo Reiniciando el sistema...");
-                writer.println("start \"\" java -cp \"dist\\Restaurante_comuneros.jar;librerias\\*\" restaurante.Restaurante");
+                
+                if (isPackaged) {
+                    writer.println("move /y update.tmp app\\Restaurante_comuneros.jar > nul");
+                    writer.println("echo Reiniciando el sistema...");
+                    writer.println("start \"\" Comuneros.exe");
+                } else {
+                    writer.println("move /y update.tmp dist\\Restaurante_comuneros.jar > nul");
+                    writer.println("echo Reiniciando el sistema...");
+                    writer.println("start \"\" java -cp \"dist\\Restaurante_comuneros.jar;librerias\\*\" restaurante.Restaurante");
+                }
+                
                 writer.println("del \"%~f0\"");
                 writer.close();
                 
                 Runtime.getRuntime().exec("cmd /c start /b update.bat");
             } else {
                 // Generar script .sh para Linux/macOS
+                boolean isPackaged = new File("Comuneros").exists() && new File("app").exists();
+                
                 File shFile = new File("update.sh");
                 PrintWriter writer = new PrintWriter(new FileWriter(shFile));
                 writer.println("#!/bin/sh");
                 writer.println("sleep 2");
-                writer.println("mv update.tmp dist/Restaurante_comuneros.jar");
-                writer.println("java -cp \"dist/Restaurante_comuneros.jar:librerias/*\" restaurante.Restaurante &");
+                
+                if (isPackaged) {
+                    writer.println("mv update.tmp app/Restaurante_comuneros.jar");
+                    writer.println("./Comuneros &");
+                } else {
+                    writer.println("mv update.tmp dist/Restaurante_comuneros.jar");
+                    writer.println("java -cp \"dist/Restaurante_comuneros.jar:librerias/*\" restaurante.Restaurante &");
+                }
+                
                 writer.println("rm -- \"$0\"");
                 writer.close();
                 

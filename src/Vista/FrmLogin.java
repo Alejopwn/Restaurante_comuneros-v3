@@ -115,8 +115,15 @@ public class FrmLogin extends javax.swing.JFrame {
         lblCopyright.setFont(Sistema.getFontRegular(9f));
         lblCopyright.setForeground(new Color(80, 120, 180));
         lblCopyright.setHorizontalAlignment(SwingConstants.CENTER);
-        lblCopyright.setBounds(0, 400, 290, 20);
+        lblCopyright.setBounds(0, 395, 290, 20);
         panelLeft.add(lblCopyright);
+
+        JLabel lblVersion = new JLabel("Versión " + Modelo.AutoUpdater.CURRENT_VERSION);
+        lblVersion.setFont(Sistema.getFontRegular(9f));
+        lblVersion.setForeground(new Color(100, 140, 200));
+        lblVersion.setHorizontalAlignment(SwingConstants.CENTER);
+        lblVersion.setBounds(0, 415, 290, 20);
+        panelLeft.add(lblVersion);
 
         // ─── PANEL DERECHO (formulario oscuro Slate 900) ───────────────────────────────────
         panelRight = new JPanel(null);

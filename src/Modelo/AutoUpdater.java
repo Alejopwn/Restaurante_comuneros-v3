@@ -188,8 +188,8 @@ public class AutoUpdater {
 
         try {
             if (os.contains("win")) {
-                // --- Windows: usar VBScript (más fiable que .bat para abrir procesos) ---
-                File vbsFile = new File(workDir, "update.vbs");
+                // --- Windows: usar script .bat con taskkill para evitar bloqueos de archivos ---
+                File batFile = new File(workDir, "update.bat");
                 File logFile = new File(workDir, "update_log.txt");
 
                 String jarDest, exePath;
@@ -201,31 +201,33 @@ public class AutoUpdater {
                     exePath = "";
                 }
 
-                PrintWriter writer = new PrintWriter(new FileWriter(vbsFile));
-                writer.println("' Actualizador automatico - Comuneros POS");
-                writer.println("WScript.Sleep 5000");
-                writer.println("Dim fso, shell");
-                writer.println("Set fso   = CreateObject(\"Scripting.FileSystemObject\")");
-                writer.println("Set shell = CreateObject(\"WScript.Shell\")");
-                writer.println("On Error Resume Next");
-                writer.println("fso.CopyFile \"" + tempJar.getAbsolutePath() + "\", \"" + jarDest + "\", True");
-                writer.println("If Err.Number <> 0 Then");
-                writer.println("  Dim logErr");
-                writer.println("  Set logErr = fso.OpenTextFile(\"" + logFile.getAbsolutePath() + "\", 8, True)");
-                writer.println("  logErr.WriteLine \"[ERROR] \" & Err.Description");
-                writer.println("  logErr.Close");
-                writer.println("Else");
-                writer.println("  fso.DeleteFile \"" + tempJar.getAbsolutePath() + "\"");
+                PrintWriter writer = new PrintWriter(new FileWriter(batFile));
+                writer.println("@echo off");
+                writer.println(":: Esperar a que la JVM inicie el cierre");
+                writer.println("timeout /t 3 /nobreak > nul 2>&1");
+                writer.println(":: Matar cualquier instancia residual de Comuneros.exe que bloquee el JAR");
+                writer.println("taskkill /f /im Comuneros.exe > nul 2>&1");
+                writer.println(":: Intentar copiar la actualizacion");
+                writer.println("copy /y \"" + tempJar.getAbsolutePath() + "\" \"" + jarDest + "\" > nul 2>&1");
+                writer.println("if errorlevel 1 (");
+                writer.println("  :: Si falla, reintentar una vez mas con delay adicional");
+                writer.println("  taskkill /f /im Comuneros.exe > nul 2>&1");
+                writer.println("  timeout /t 2 /nobreak > nul 2>&1");
+                writer.println("  copy /y \"" + tempJar.getAbsolutePath() + "\" \"" + jarDest + "\" > \"" + logFile.getAbsolutePath() + "\" 2>&1");
+                writer.println(")");
+                writer.println("if exist \"" + jarDest + "\" (");
+                writer.println("  del /f /q \"" + tempJar.getAbsolutePath() + "\" > nul 2>&1");
                 if (isPackaged) {
-                    writer.println("  shell.Run \"\"\"" + exePath + "\"\"\", 1, False");
+                    writer.println("  start \"\" \"" + exePath + "\"");
                 } else {
-                    writer.println("  shell.Run \"java -cp dist\\\\Restaurante_comuneros.jar;librerias\\\\* restaurante.Restaurante\", 1, False");
+                    writer.println("  start \"\" java -cp \"dist\\Restaurante_comuneros.jar;librerias\\*\" restaurante.Restaurante");
                 }
-                writer.println("End If");
-                writer.println("fso.DeleteFile WScript.ScriptFullName");
+                writer.println(")");
+                writer.println(":: Auto-eliminar este script");
+                writer.println("del /f /q \"%~f0\" > nul 2>&1");
                 writer.close();
 
-                Runtime.getRuntime().exec(new String[]{"wscript.exe", "//Nologo", vbsFile.getAbsolutePath()});
+                Runtime.getRuntime().exec(new String[]{"cmd.exe", "/c", "start", "/b", batFile.getAbsolutePath()});
 
             } else {
                 // --- Linux/macOS: usar script .sh ---

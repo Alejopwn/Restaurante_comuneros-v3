@@ -192,13 +192,14 @@ public class AutoUpdater {
                 writer.println("On Error Resume Next");
                 writer.println("fso.CopyFile \"" + tempJar.getAbsolutePath() + "\", \"" + jarDest + "\", True");
                 writer.println("If Err.Number <> 0 Then");
-                writer.println("  Dim logErr : Open \"" + logFile.getAbsolutePath() + "\" For Append As #1");
-                writer.println("  Print #1, \"[ERROR] \" & Err.Description");
-                writer.println("  Close #1");
+                writer.println("  Dim logErr");
+                writer.println("  Set logErr = fso.OpenTextFile(\"" + logFile.getAbsolutePath() + "\", 8, True)");
+                writer.println("  logErr.WriteLine \"[ERROR] \" & Err.Description");
+                writer.println("  logErr.Close");
                 writer.println("Else");
                 writer.println("  fso.DeleteFile \"" + tempJar.getAbsolutePath() + "\"");
                 if (isPackaged) {
-                    writer.println("  shell.Run \"\\\"" + exePath + "\"\\\"\", 1, False");
+                    writer.println("  shell.Run \"\"\"" + exePath + "\"\"\", 1, False");
                 } else {
                     writer.println("  shell.Run \"java -cp dist\\\\Restaurante_comuneros.jar;librerias\\\\* restaurante.Restaurante\", 1, False");
                 }

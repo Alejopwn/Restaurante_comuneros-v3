@@ -6,7 +6,7 @@ import java.net.URL;
 
 public class AutoUpdater {
 
-    public static final String CURRENT_VERSION = "1.0.5";
+    public static final String CURRENT_VERSION = "1.0.6";
     private static final String VERSION_URL = "https://raw.githubusercontent.com/Alejopwn/Restaurante_comuneros-v3/main/version.txt";
 
     public interface UpdateProgressCallback {
@@ -136,8 +136,6 @@ public class AutoUpdater {
             // Obtener la ruta absoluta del ejecutable actual de la JVM
             String javaExePath = ProcessHandle.current().info().command().orElse("");
             File javaExe = new File(javaExePath);
-            // La estructura de jpackage es: Comuneros/runtime/bin/java.exe
-            // Subiendo 3 niveles desde java.exe llegamos a la carpeta Comuneros/
             File appRoot = javaExe.getParentFile() != null
                 ? javaExe.getParentFile().getParentFile() != null
                     ? javaExe.getParentFile().getParentFile().getParentFile()
@@ -154,38 +152,45 @@ public class AutoUpdater {
                 File batFile = new File(appRootPath, "update.bat");
                 PrintWriter writer = new PrintWriter(new FileWriter(batFile));
                 writer.println("@echo off");
-                writer.println("echo Esperando a que el sistema POS se cierre...");
-                writer.println("ping 127.0.0.1 -n 3 > nul");
-                writer.println("echo Aplicando actualizacion...");
+                writer.println("echo [LOG] Iniciando proceso de actualizacion... > update_log.txt");
+                writer.println("echo [LOG] Esperando a que el sistema POS se cierre por completo... >> update_log.txt");
+                // Esperar 5 segundos (6 pings) para asegurar que el proceso Java liberó el JAR
+                writer.println("ping 127.0.0.1 -n 6 > nul");
+                writer.println("echo [LOG] Reemplazando JAR de la aplicacion... >> update_log.txt");
                 
                 if (isPackaged) {
                     String jarDest = new File(appRoot, "app\\Restaurante_comuneros.jar").getAbsolutePath();
                     String tmpSrc  = new File(appRootPath, "update.tmp").getAbsolutePath();
                     String exePath = new File(appRootPath, "Comuneros.exe").getAbsolutePath();
-                    writer.println("move /y \"" + tmpSrc + "\" \"" + jarDest + "\" > nul");
-                    writer.println("echo Reiniciando el sistema...");
-                    writer.println("start \"\" \"" + exePath + "\"");
+                    writer.println("move /y \"" + tmpSrc + "\" \"" + jarDest + "\" >> update_log.txt 2>&1");
+                    writer.println("echo [LOG] Reiniciando la aplicacion portable... >> update_log.txt");
+                    writer.println("start \"\" \"" + exePath + "\" >> update_log.txt 2>&1");
                 } else {
-                    writer.println("move /y update.tmp dist\\Restaurante_comuneros.jar > nul");
-                    writer.println("echo Reiniciando el sistema...");
-                    writer.println("start \"\" java -cp \"dist\\Restaurante_comuneros.jar;librerias\\*\" restaurante.Restaurante");
+                    writer.println("move /y update.tmp dist\\Restaurante_comuneros.jar >> update_log.txt 2>&1");
+                    writer.println("echo [LOG] Reiniciando la aplicacion en modo desarrollo... >> update_log.txt");
+                    writer.println("start \"\" java -cp \"dist\\Restaurante_comuneros.jar;librerias\\*\" restaurante.Restaurante >> update_log.txt 2>&1");
                 }
                 
+                writer.println("echo [LOG] Actualizacion completada. >> update_log.txt");
                 writer.println("del \"%~f0\"");
                 writer.close();
                 
-                Runtime.getRuntime().exec("cmd /c start /b \"\" \"" + batFile.getAbsolutePath() + "\"");
+                // Ejecutar el script usando ProcessBuilder de forma robusta
+                ProcessBuilder pb = new ProcessBuilder("cmd.exe", "/c", batFile.getName());
+                pb.directory(appRoot != null ? appRoot : new File("."));
+                pb.start();
             } else {
                 File shFile = new File(appRootPath, "update.sh");
                 PrintWriter writer = new PrintWriter(new FileWriter(shFile));
                 writer.println("#!/bin/sh");
-                writer.println("sleep 2");
+                writer.println("echo \"[LOG] Iniciando actualizacion...\" > update_log.txt");
+                writer.println("sleep 4");
                 
                 if (isPackaged) {
-                    writer.println("mv \"" + appRootPath + "/update.tmp\" \"" + appRootPath + "/app/Restaurante_comuneros.jar\"");
+                    writer.println("mv \"" + appRootPath + "/update.tmp\" \"" + appRootPath + "/app/Restaurante_comuneros.jar\" >> update_log.txt 2>&1");
                     writer.println("\"" + appRootPath + "/Comuneros\" &");
                 } else {
-                    writer.println("mv update.tmp dist/Restaurante_comuneros.jar");
+                    writer.println("mv update.tmp dist/Restaurante_comuneros.jar >> update_log.txt 2>&1");
                     writer.println("java -cp \"dist/Restaurante_comuneros.jar:librerias/*\" restaurante.Restaurante &");
                 }
                 
@@ -193,7 +198,9 @@ public class AutoUpdater {
                 writer.close();
                 
                 shFile.setExecutable(true);
-                Runtime.getRuntime().exec(new String[]{"/bin/sh", shFile.getAbsolutePath()});
+                ProcessBuilder pb = new ProcessBuilder("/bin/sh", shFile.getName());
+                pb.directory(appRoot != null ? appRoot : new File("."));
+                pb.start();
             }
             
             System.out.println("🔄 Lanzando instalador en segundo plano y cerrando JVM...");

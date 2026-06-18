@@ -103,6 +103,20 @@ public class Splash extends JWindow {
         new SwingWorker<Void, int[]>() {
             @Override
             protected Void doInBackground() throws Exception {
+                // --- Buscar Actualizaciones ---
+                boolean actualizando = Modelo.AutoUpdater.checkAndApply((status, percentage) -> {
+                    SwingUtilities.invokeLater(() -> {
+                        lblStatus.setText(status);
+                        progressBar.setValue(percentage);
+                    });
+                });
+
+                if (actualizando) {
+                    // Si se está actualizando, detenemos el flujo normal de carga
+                    // ya que el script externo reiniciará el programa.
+                    return null;
+                }
+
                 publish(new int[]{10, 0}); // {progreso, sleep}
                 Thread.sleep(350);
 
@@ -142,6 +156,7 @@ public class Splash extends JWindow {
             @Override
             protected void done() {
                 dispose();
+                // Solo llamamos onComplete (mostrar Login) si no se cerró la JVM por actualización
                 onComplete.run();
             }
         }.execute();

@@ -91,55 +91,55 @@ public class FrmLogin extends javax.swing.JFrame {
             lblLogoImg.setIcon(new javax.swing.ImageIcon(imgLogo));
         } catch (Exception ex) {
             lblLogoImg.setText("🍕"); // Fallback si no carga
-            lblLogoImg.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 60));
+            lblLogoImg.setFont(Sistema.getFontRegular(60f));
         }
         lblLogoImg.setHorizontalAlignment(SwingConstants.CENTER);
         lblLogoImg.setBounds(0, 60, 290, 120);
         panelLeft.add(lblLogoImg);
 
         lblLogo = new JLabel("COMUNEROS");
-        lblLogo.setFont(new Font("Segoe UI", Font.BOLD, 28));
+        lblLogo.setFont(Sistema.getFontBold(28f));
         lblLogo.setForeground(Color.WHITE);
         lblLogo.setHorizontalAlignment(SwingConstants.CENTER);
         lblLogo.setBounds(0, 185, 290, 40);
         panelLeft.add(lblLogo);
 
         lblSubtitle = new JLabel("Puente Nacional");
-        lblSubtitle.setFont(new Font("Segoe UI", Font.PLAIN, 15));
+        lblSubtitle.setFont(Sistema.getFontRegular(15f));
         lblSubtitle.setForeground(new Color(147, 197, 253));
         lblSubtitle.setHorizontalAlignment(SwingConstants.CENTER);
         lblSubtitle.setBounds(0, 225, 290, 25);
         panelLeft.add(lblSubtitle);
 
         JLabel lblCopyright = new JLabel("\u00a9 2025 alejopwn. Todos los derechos reservados.");
-        lblCopyright.setFont(new Font("Segoe UI", Font.PLAIN, 9));
+        lblCopyright.setFont(Sistema.getFontRegular(9f));
         lblCopyright.setForeground(new Color(80, 120, 180));
         lblCopyright.setHorizontalAlignment(SwingConstants.CENTER);
         lblCopyright.setBounds(0, 400, 290, 20);
         panelLeft.add(lblCopyright);
 
-        // ─── PANEL DERECHO (formulario blanco) ───────────────────────────────────
+        // ─── PANEL DERECHO (formulario oscuro Slate 900) ───────────────────────────────────
         panelRight = new JPanel(null);
-        panelRight.setBackground(Color.WHITE);
+        panelRight.setBackground(new Color(15, 23, 42)); // Slate 900
 
         JLabel lblBienvenido = new JLabel("Bienvenido de vuelta");
-        lblBienvenido.setFont(new Font("Segoe UI", Font.BOLD, 22));
-        lblBienvenido.setForeground(new Color(15, 23, 42));
+        lblBienvenido.setFont(Sistema.getFontBold(22f));
+        lblBienvenido.setForeground(new Color(241, 245, 249)); // Slate 100
         lblBienvenido.setHorizontalAlignment(SwingConstants.CENTER);
         lblBienvenido.setBounds(0, 50, 410, 30);
         panelRight.add(lblBienvenido);
 
         JLabel lblHint = new JLabel("Ingrese sus credenciales para continuar");
-        lblHint.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        lblHint.setForeground(new Color(107, 114, 128));
+        lblHint.setFont(Sistema.getFontRegular(12f));
+        lblHint.setForeground(new Color(148, 163, 184)); // Slate 400
         lblHint.setHorizontalAlignment(SwingConstants.CENTER);
         lblHint.setBounds(0, 82, 410, 20);
         panelRight.add(lblHint);
 
         // Label Correo
         JLabel lblEmailLbl = new JLabel("Correo electrónico");
-        lblEmailLbl.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        lblEmailLbl.setForeground(new Color(55, 65, 81));
+        lblEmailLbl.setFont(Sistema.getFontBold(12f));
+        lblEmailLbl.setForeground(new Color(203, 213, 225)); // Slate 300
         lblEmailLbl.setBounds(40, 130, 200, 20);
         panelRight.add(lblEmailLbl);
 
@@ -149,35 +149,36 @@ public class FrmLogin extends javax.swing.JFrame {
             protected void paintBorder(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(isFocusOwner() ? new Color(59, 130, 246) : new Color(209, 213, 219));
+                g2.setColor(isFocusOwner() ? new Color(96, 165, 250) : new Color(51, 65, 85)); // Slate 700 / Azul brillante
                 g2.setStroke(new BasicStroke(isFocusOwner() ? 2f : 1.5f));
                 g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
                 g2.dispose();
             }
         };
-        txtCorreo.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        txtCorreo.setForeground(new Color(55, 65, 81));
+        txtCorreo.setFont(Sistema.getFontRegular(14f));
+        txtCorreo.setForeground(Color.WHITE);
         txtCorreo.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
         txtCorreo.setOpaque(true);
-        txtCorreo.setBackground(new Color(249, 250, 251));
+        txtCorreo.setBackground(new Color(30, 41, 59)); // Slate 800
+        txtCorreo.setCaretColor(new Color(96, 165, 250));
         txtCorreo.setBounds(40, 155, 330, 45);
         panelRight.add(txtCorreo);
 
         // Placeholder
         txtCorreo.setText("usuario@restaurante.com");
-        txtCorreo.setForeground(new Color(156, 163, 175));
+        txtCorreo.setForeground(new Color(100, 116, 139)); // Slate 500
         txtCorreo.addFocusListener(new java.awt.event.FocusAdapter() {
             public void focusGained(java.awt.event.FocusEvent e) {
                 if (txtCorreo.getText().equals("usuario@restaurante.com")) {
                     txtCorreo.setText("");
-                    txtCorreo.setForeground(new Color(55, 65, 81));
+                    txtCorreo.setForeground(Color.WHITE);
                 }
                 txtCorreo.repaint();
             }
             public void focusLost(java.awt.event.FocusEvent e) {
                 if (txtCorreo.getText().isEmpty()) {
                     txtCorreo.setText("usuario@restaurante.com");
-                    txtCorreo.setForeground(new Color(156, 163, 175));
+                    txtCorreo.setForeground(new Color(100, 116, 139));
                 }
                 txtCorreo.repaint();
             }
@@ -185,8 +186,8 @@ public class FrmLogin extends javax.swing.JFrame {
 
         // Label Pass
         JLabel lblPassLbl = new JLabel("Contraseña");
-        lblPassLbl.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        lblPassLbl.setForeground(new Color(55, 65, 81));
+        lblPassLbl.setFont(Sistema.getFontBold(12f));
+        lblPassLbl.setForeground(new Color(203, 213, 225));
         lblPassLbl.setBounds(40, 215, 200, 20);
         panelRight.add(lblPassLbl);
 
@@ -196,16 +197,17 @@ public class FrmLogin extends javax.swing.JFrame {
             protected void paintBorder(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(isFocusOwner() ? new Color(59, 130, 246) : new Color(209, 213, 219));
+                g2.setColor(isFocusOwner() ? new Color(96, 165, 250) : new Color(51, 65, 85));
                 g2.setStroke(new BasicStroke(isFocusOwner() ? 2f : 1.5f));
                 g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
                 g2.dispose();
             }
         };
-        txtPass.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        txtPass.setForeground(new Color(156, 163, 175));
+        txtPass.setFont(Sistema.getFontRegular(14f));
+        txtPass.setForeground(new Color(100, 116, 139));
         txtPass.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
-        txtPass.setBackground(new Color(249, 250, 251));
+        txtPass.setBackground(new Color(30, 41, 59));
+        txtPass.setCaretColor(new Color(96, 165, 250));
         txtPass.setEchoChar((char) 0);
         txtPass.setText("••••••••");
         txtPass.setBounds(40, 240, 330, 45);
@@ -214,7 +216,7 @@ public class FrmLogin extends javax.swing.JFrame {
             public void focusGained(java.awt.event.FocusEvent e) {
                 if (String.valueOf(txtPass.getPassword()).equals("••••••••")) {
                     txtPass.setText("");
-                    txtPass.setForeground(new Color(55, 65, 81));
+                    txtPass.setForeground(Color.WHITE);
                     txtPass.setEchoChar('●');
                 }
                 txtPass.repaint();
@@ -223,7 +225,7 @@ public class FrmLogin extends javax.swing.JFrame {
                 if (String.valueOf(txtPass.getPassword()).isEmpty()) {
                     txtPass.setEchoChar((char) 0);
                     txtPass.setText("••••••••");
-                    txtPass.setForeground(new Color(156, 163, 175));
+                    txtPass.setForeground(new Color(100, 116, 139));
                 }
                 txtPass.repaint();
             }
@@ -231,7 +233,6 @@ public class FrmLogin extends javax.swing.JFrame {
 
         // Barra de progreso (quitada por solicitud - acceso directo)
         barra = new JProgressBar(); // Se mantiene como variable pero NO se agrega al panel
-
 
         // Botón Ingresar
         btnIniciar = new JButton("Ingresar") {
@@ -247,7 +248,7 @@ public class FrmLogin extends javax.swing.JFrame {
                 super.paintComponent(g);
             }
         };
-        btnIniciar.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        btnIniciar.setFont(Sistema.getFontBold(15f));
         btnIniciar.setForeground(Color.WHITE);
         btnIniciar.setContentAreaFilled(false);
         btnIniciar.setBorderPainted(false);
@@ -258,8 +259,8 @@ public class FrmLogin extends javax.swing.JFrame {
 
         // Botón Salir (link-style)
         jButton1 = new JButton("Salir del sistema");
-        jButton1.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        jButton1.setForeground(new Color(107, 114, 128));
+        jButton1.setFont(Sistema.getFontRegular(12f));
+        jButton1.setForeground(new Color(148, 163, 184));
         jButton1.setBorderPainted(false);
         jButton1.setContentAreaFilled(false);
         jButton1.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));

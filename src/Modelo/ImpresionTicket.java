@@ -26,6 +26,8 @@ public class ImpresionTicket {
     private String sala;
     private int numMesa;
     private String usuario;
+    private double pagoEfectivo;
+    private double pagoTransaccion;
     private Conexion cn = new Conexion();
     private PedidosDao pedidosDao = new PedidosDao();
 
@@ -54,7 +56,7 @@ public class ImpresionTicket {
     }
 
     public void datosPedido(int idPedido) {
-        String sql = "SELECT s.nombre AS sala, p.num_mesa, p.usuario FROM pedidos p "
+        String sql = "SELECT s.nombre AS sala, p.num_mesa, p.usuario, p.pago_efectivo, p.pago_transaccion FROM pedidos p "
                 + "INNER JOIN salas s ON p.id_sala = s.id WHERE p.id = ?";
         try (Connection con = cn.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, idPedido);
@@ -63,11 +65,15 @@ public class ImpresionTicket {
                     sala = rs.getString("sala");
                     numMesa = rs.getInt("num_mesa");
                     usuario = rs.getString("usuario");
+                    pagoEfectivo = rs.getDouble("pago_efectivo");
+                    pagoTransaccion = rs.getDouble("pago_transaccion");
                 } else {
                     System.out.println("No se encontró el pedido con ID: " + idPedido);
                     sala = "Desconocida";
                     numMesa = 0;
                     usuario = "Desconocido";
+                    pagoEfectivo = 0.0;
+                    pagoTransaccion = 0.0;
                 }
             }
         } catch (SQLException e) {
@@ -75,6 +81,8 @@ public class ImpresionTicket {
             sala = "Error";
             numMesa = 0;
             usuario = "Error";
+            pagoEfectivo = 0.0;
+            pagoTransaccion = 0.0;
         }
     }
 
@@ -124,7 +132,12 @@ public class ImpresionTicket {
             sb.append("-----------------------------\n");
 
             // TOTAL
-            sb.append(String.format("TOTAL A PAGAR:      %s\n", formatearMoneda(totalGeneral)));
+            sb.append(String.format("TOTAL CONSUMO:      %s\n", formatearMoneda(totalGeneral)));
+            sb.append(String.format("PAGO EFECTIVO:      %s\n", formatearMoneda(pagoEfectivo)));
+            sb.append(String.format("PAGO TRANSFERENCIA: %s\n", formatearMoneda(pagoTransaccion)));
+            double cambio = (pagoEfectivo + pagoTransaccion) - totalGeneral;
+            if (cambio < 0) cambio = 0.0;
+            sb.append(String.format("CAMBIO / VUELTOS:   %s\n", formatearMoneda(cambio)));
             sb.append("-----------------------------\n");
 
             // MENSAJE

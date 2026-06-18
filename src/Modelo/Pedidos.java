@@ -9,6 +9,8 @@ public class Pedidos {
     private String sala;
     private String usuario;
     private String estado;
+    private double pago_efectivo;
+    private double pago_transaccion;
 
     public Pedidos() {
     }
@@ -22,6 +24,19 @@ public class Pedidos {
         this.sala = sala;
         this.usuario = usuario;
         this.estado = estado;
+    }
+
+    public Pedidos(int id, int id_sala, int num_mesa, String fecha, double total, String sala, String usuario, String estado, double pago_efectivo, double pago_transaccion) {
+        this.id = id;
+        this.id_sala = id_sala;
+        this.num_mesa = num_mesa;
+        this.fecha = fecha;
+        this.total = total;
+        this.sala = sala;
+        this.usuario = usuario;
+        this.estado = estado;
+        this.pago_efectivo = pago_efectivo;
+        this.pago_transaccion = pago_transaccion;
     }
 
     public int getId() {
@@ -88,6 +103,20 @@ public class Pedidos {
         this.estado = estado;
     }
 
-    
-        
+    public double getPago_efectivo() {
+        return pago_efectivo;
+    }
+
+    public void setPago_efectivo(double pago_efectivo) {
+        this.pago_efectivo = pago_efectivo;
+    }
+
+    public double getPago_transaccion() {
+        return pago_transaccion;
+    }
+
+    public void setPago_transaccion(double pago_transaccion) {
+        this.pago_transaccion = pago_transaccion;
+    }
 }
+

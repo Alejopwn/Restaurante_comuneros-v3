@@ -19,6 +19,7 @@ import Modelo.Tables;
 import Modelo.login;
 import java.awt.Color;
 import java.awt.Cursor;
+import java.awt.Font;
 import java.awt.Image;
 import java.awt.event.ActionEvent;
 import java.text.SimpleDateFormat;
@@ -45,6 +46,12 @@ import javax.swing.JComboBox;
 import javax.swing.JDialog;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.GradientPaint;
+import java.awt.BasicStroke;
+import java.awt.geom.Path2D;
+import java.text.DecimalFormat;
 
 public final class Sistema extends javax.swing.JFrame {
 
@@ -83,6 +90,9 @@ public final class Sistema extends javax.swing.JFrame {
         this.setLocationRelativeTo(null);
         txtIdHistorialPedido.setVisible(false);
         txtIdConfig.setVisible(false);
+        btnEfectivo.setVisible(false);
+        btnTransaccion.setVisible(false);
+        jComboSalas.setVisible(false);
 
         // UX: Reloj en tiempo real
         javax.swing.Timer timerReloj = new javax.swing.Timer(1000, e -> {
@@ -124,6 +134,7 @@ public final class Sistema extends javax.swing.JFrame {
             LabelVendedor.setBackground(new java.awt.Color(230, 126, 34)); // Naranja para Asistente
         } else {
             LabelVendedor.setBackground(new java.awt.Color(39, 174, 96)); // Verde para Admin
+            btnSala.setEnabled(true);
             btnEliminarPlato.setEnabled(true);
             btnEliminarSala.setEnabled(true);
         }
@@ -1692,15 +1703,18 @@ public final class Sistema extends javax.swing.JFrame {
     }//GEN-LAST:event_btnConfigActionPerformed
 
     private void btnVentasActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnVentasActionPerformed
-        // TODO add your handling code here:
         LimpiarTable();
         ListarPedidos();
-        actualizarTotalDia(); // Llamar aquí para actualizar el total del día
+        actualizarTotalDia();
         LimpiarTableMenu();
         LimpiarPlatos();
 
-        jTabbedPane1.setSelectedIndex(5);
+        // Mostrar Dashboard por defecto al entrar a Ventas
+        setDashboardVisible(true);
+        actualizarEstiloToggle(true);
+        actualizarDashboardData();
 
+        jTabbedPane1.setSelectedIndex(5);
     }//GEN-LAST:event_btnVentasActionPerformed
 
     private void btnUsuariosActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnUsuariosActionPerformed
@@ -1924,28 +1938,140 @@ public final class Sistema extends javax.swing.JFrame {
             JOptionPane.showMessageDialog(null, "No hay pedido seleccionado");
             return;
         }
-        String idPlatoStr = JOptionPane.showInputDialog(null, "Ingresa el ID del plato:");
-        if (idPlatoStr == null || idPlatoStr.trim().isEmpty()) {
-            JOptionPane.showMessageDialog(null, "Ingresa un ID válido");
-            return;
-        }
-        try {
-            int idPedido = Integer.parseInt(txtIdPedido.getText());
-            int idPlato = Integer.parseInt(idPlatoStr);
-            PlatosDao platosDao = new PlatosDao();
-            Platos plato = platosDao.buscarPorId(idPlato);
-            if (plato != null) {
-                double precio = plato.getPrecio();
-                String nombre = plato.getNombre();
-                double total = 1.0 * precio;
-                item++;
-                modelo = (DefaultTableModel) tableFinalizar.getModel();
+        
+        final int idPedido = Integer.parseInt(txtIdPedido.getText());
+        
+        // Custom Dialog for Plate Search
+        final javax.swing.JDialog dialog = new javax.swing.JDialog(this, "Buscar y Agregar Plato", true);
+        dialog.setSize(600, 450);
+        dialog.setLocationRelativeTo(this);
+        dialog.getContentPane().setBackground(new java.awt.Color(15, 23, 42)); // Slate 900
+        dialog.setLayout(new java.awt.BorderLayout(10, 10));
+        
+        // Colors & Fonts
+        final java.awt.Color slate100 = new java.awt.Color(241, 245, 249);
+        final java.awt.Color slate300 = new java.awt.Color(203, 213, 225);
+        final java.awt.Color slate700 = new java.awt.Color(51, 65, 85);
+        final java.awt.Color slate800 = new java.awt.Color(30, 41, 59);
+        java.awt.Font fontGeneral = new java.awt.Font("Outfit", java.awt.Font.PLAIN, 14);
+        java.awt.Font fontBold = new java.awt.Font("Outfit", java.awt.Font.BOLD, 14);
+        
+        // Top search panel
+        javax.swing.JPanel pnlTop = new javax.swing.JPanel(new java.awt.BorderLayout(5, 5));
+        pnlTop.setBackground(new java.awt.Color(15, 23, 42));
+        pnlTop.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        javax.swing.JLabel lblBuscar = new javax.swing.JLabel("Buscar Plato: ");
+        lblBuscar.setFont(fontBold);
+        lblBuscar.setForeground(slate300);
+        pnlTop.add(lblBuscar, java.awt.BorderLayout.WEST);
+        
+        final javax.swing.JTextField txtBuscar = new javax.swing.JTextField();
+        txtBuscar.setFont(fontGeneral);
+        txtBuscar.setBackground(slate800);
+        txtBuscar.setForeground(slate100);
+        txtBuscar.setCaretColor(slate100);
+        txtBuscar.setBorder(javax.swing.BorderFactory.createLineBorder(slate700));
+        pnlTop.add(txtBuscar, java.awt.BorderLayout.CENTER);
+        
+        dialog.add(pnlTop, java.awt.BorderLayout.NORTH);
+        
+        // Center Table panel
+        final DefaultTableModel modelPlatos = new DefaultTableModel(new Object[]{"ID", "Nombre", "Precio"}, 0) {
+            @Override
+            public boolean isCellEditable(int row, int col) { return false; }
+        };
+        final javax.swing.JTable tblPlatos = new javax.swing.JTable(modelPlatos);
+        tblPlatos.setFont(fontGeneral);
+        tblPlatos.setBackground(slate800);
+        tblPlatos.setForeground(slate100);
+        tblPlatos.setGridColor(slate700);
+        tblPlatos.setRowHeight(25);
+        tblPlatos.getTableHeader().setBackground(slate700);
+        tblPlatos.getTableHeader().setForeground(slate100);
+        tblPlatos.getTableHeader().setFont(fontBold);
+        
+        // Scroll pane
+        javax.swing.JScrollPane scrollPane = new javax.swing.JScrollPane(tblPlatos);
+        scrollPane.getViewport().setBackground(new java.awt.Color(15, 23, 42));
+        scrollPane.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 10, 0, 10));
+        dialog.add(scrollPane, java.awt.BorderLayout.CENTER);
+        
+        final PlatosDao platosDao = new PlatosDao();
+        final Runnable cargarPlatos = new Runnable() {
+            @Override
+            public void run() {
+                String filtro = txtBuscar.getText().trim();
+                java.util.List<Platos> platos = platosDao.Listar(filtro);
+                modelPlatos.setRowCount(0);
+                for (Platos p : platos) {
+                    modelPlatos.addRow(new Object[]{p.getId(), p.getNombre(), p.getPrecio()});
+                }
+            }
+        };
+        
+        txtBuscar.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { cargarPlatos.run(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { cargarPlatos.run(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { cargarPlatos.run(); }
+        });
+        
+        // Bottom action panel
+        javax.swing.JPanel pnlBottom = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 10, 10));
+        pnlBottom.setBackground(new java.awt.Color(15, 23, 42));
+        
+        final javax.swing.JButton btnAgregar = new javax.swing.JButton("Agregar");
+        btnAgregar.setBackground(new java.awt.Color(34, 197, 94));
+        btnAgregar.setForeground(slate100);
+        btnAgregar.setFont(fontBold);
+        
+        final javax.swing.JButton btnCancelar = new javax.swing.JButton("Cancelar");
+        btnCancelar.setBackground(new java.awt.Color(239, 68, 68));
+        btnCancelar.setForeground(slate100);
+        btnCancelar.setFont(fontBold);
+        
+        pnlBottom.add(btnAgregar);
+        pnlBottom.add(btnCancelar);
+        dialog.add(pnlBottom, java.awt.BorderLayout.SOUTH);
+        
+        tblPlatos.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    btnAgregar.doClick();
+                }
+            }
+        });
+        
+        btnCancelar.addActionListener(new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                dialog.dispose();
+            }
+        });
+        
+        btnAgregar.addActionListener(new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                int row = tblPlatos.getSelectedRow();
+                if (row == -1) {
+                    JOptionPane.showMessageDialog(dialog, "Selecciona un plato de la lista", "Advertencia", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+                
+                int idPlato = Integer.parseInt(tblPlatos.getValueAt(row, 0).toString());
+                String nombrePlato = tblPlatos.getValueAt(row, 1).toString();
+                double precioPlato = Double.parseDouble(tblPlatos.getValueAt(row, 2).toString());
+                
+                dialog.dispose();
+                
                 DetallePedido det = new DetallePedido();
-                det.setNombre(nombre);
-                det.setPrecio(precio);
+                det.setNombre(nombrePlato);
+                det.setPrecio(precioPlato);
                 det.setCantidad(1);
                 det.setComentario("");
                 det.setId_pedido(idPedido);
+                
                 if (pedDao.RegistrarDetalle(det)) {
                     verPedidoDetalle(idPedido);
                     TotalPagar(tableFinalizar, totalFinalizar);
@@ -1953,12 +2079,11 @@ public final class Sistema extends javax.swing.JFrame {
                 } else {
                     JOptionPane.showMessageDialog(null, "Error al agregar el plato");
                 }
-            } else {
-                JOptionPane.showMessageDialog(null, "Plato no encontrado con ID: " + idPlato);
             }
-        } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(null, "El ID debe ser un número válido");
-        }
+        });
+        
+        cargarPlatos.run();
+        dialog.setVisible(true);
     }//GEN-LAST:event_btnAddPlatoFinalizarActionPerformed
 
     private void btnEliminarPlatoFinalizarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEliminarPlatoFinalizarActionPerformed
@@ -2017,45 +2142,262 @@ public final class Sistema extends javax.swing.JFrame {
             return;
         }
 
-        int pregunta = JOptionPane.showConfirmDialog(null, "Esta seguro de finalizar");
-        if (pregunta == 0) {
-            final int idPedido = Integer.parseInt(txtIdPedido.getText());
-            btnFinalizar.setEnabled(false);
-            btnFinalizar.setText("⏳ Procesando...");
-            new javax.swing.SwingWorker<Boolean, Void>() {
-                @Override
-                protected Boolean doInBackground() {
-                    boolean ok = pedDao.actualizarEstado(idPedido);
-                    if (ok) {
-                        pedDao.pdfPedido(idPedido);
-                        PedidosDao pedidosDao = new PedidosDao();
-                        pedidosDao.generarReporteDiario();
-                    }
-                    return ok;
-                }
-
-                @Override
-                protected void done() {
-                    try {
-                        boolean ok = get();
-                        btnFinalizar.setEnabled(true);
-                        btnFinalizar.setText("Finalizar");
-                        if (ok) {
-                            LimpiarTable();
-                            ListarPedidos();
-                            actualizarTotalDia();
-                            JOptionPane.showMessageDialog(Sistema.this, "✅ Pedido finalizado.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
-                        } else {
-                            JOptionPane.showMessageDialog(Sistema.this, "Error al finalizar el pedido.", "Error", JOptionPane.ERROR_MESSAGE);
-                        }
-                    } catch (Exception e) {
-                        btnFinalizar.setEnabled(true);
-                        btnFinalizar.setText("Finalizar");
-                        JOptionPane.showMessageDialog(Sistema.this, "Error inesperado: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-                    }
-                }
-            }.execute();
+        final int idPedido = Integer.parseInt(txtIdPedido.getText());
+        double totalCons = 0.0;
+        for (int i = 0; i < tableFinalizar.getRowCount(); i++) {
+            double sub = parseDoubleSafe(tableFinalizar.getValueAt(i, 4).toString());
+            totalCons += sub;
         }
+        final double totalConsumo = totalCons;
+
+        // Custom Dialog for Checkout (DlgCobro)
+        final javax.swing.JDialog dialog = new javax.swing.JDialog(this, "Cobro de Pedido #" + idPedido, true);
+        dialog.setLayout(new java.awt.GridBagLayout());
+        dialog.getContentPane().setBackground(new java.awt.Color(15, 23, 42)); // Slate 900
+        
+        java.awt.GridBagConstraints gbc = new java.awt.GridBagConstraints();
+        gbc.insets = new java.awt.Insets(10, 10, 10, 10);
+        gbc.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        
+        java.awt.Font fontLabel = new java.awt.Font("Outfit", java.awt.Font.BOLD, 14);
+        java.awt.Font fontValue = new java.awt.Font("Outfit", java.awt.Font.PLAIN, 14);
+        java.awt.Font fontBig = new java.awt.Font("Outfit", java.awt.Font.BOLD, 22);
+        
+        final java.awt.Color slate100 = new java.awt.Color(241, 245, 249);
+        final java.awt.Color slate300 = new java.awt.Color(203, 213, 225);
+        final java.awt.Color slate700 = new java.awt.Color(51, 65, 85);
+        final java.awt.Color slate800 = new java.awt.Color(30, 41, 59);
+        
+        // 1. Total Consumo
+        gbc.gridx = 0; gbc.gridy = 0;
+        javax.swing.JLabel lblTotal = new javax.swing.JLabel("Total Consumo:");
+        lblTotal.setFont(fontLabel);
+        lblTotal.setForeground(slate300);
+        dialog.add(lblTotal, gbc);
+        
+        gbc.gridx = 1;
+        javax.swing.JLabel lblTotalVal = new javax.swing.JLabel(String.format("COP %,.2f", totalConsumo));
+        lblTotalVal.setFont(fontBig);
+        lblTotalVal.setForeground(new java.awt.Color(34, 197, 94)); // Emerald Green
+        dialog.add(lblTotalVal, gbc);
+        
+        // 2. Pago Efectivo
+        gbc.gridx = 0; gbc.gridy = 1;
+        javax.swing.JLabel lblEfectivo = new javax.swing.JLabel("Pago Efectivo:");
+        lblEfectivo.setFont(fontLabel);
+        lblEfectivo.setForeground(slate300);
+        dialog.add(lblEfectivo, gbc);
+        
+        gbc.gridx = 1;
+        final javax.swing.JTextField txtEfectivo = new javax.swing.JTextField(12);
+        txtEfectivo.setFont(fontValue);
+        txtEfectivo.setBackground(slate800);
+        txtEfectivo.setForeground(slate100);
+        txtEfectivo.setCaretColor(slate100);
+        txtEfectivo.setBorder(javax.swing.BorderFactory.createLineBorder(slate700));
+        dialog.add(txtEfectivo, gbc);
+        
+        // 3. Pago Transferencia
+        gbc.gridx = 0; gbc.gridy = 2;
+        javax.swing.JLabel lblTrans = new javax.swing.JLabel("Pago Transferencia:");
+        lblTrans.setFont(fontLabel);
+        lblTrans.setForeground(slate300);
+        dialog.add(lblTrans, gbc);
+        
+        gbc.gridx = 1;
+        final javax.swing.JTextField txtTrans = new javax.swing.JTextField(12);
+        txtTrans.setFont(fontValue);
+        txtTrans.setBackground(slate800);
+        txtTrans.setForeground(slate100);
+        txtTrans.setCaretColor(slate100);
+        txtTrans.setBorder(javax.swing.BorderFactory.createLineBorder(slate700));
+        dialog.add(txtTrans, gbc);
+        
+        // 4. Cambio / Vueltos
+        gbc.gridx = 0; gbc.gridy = 3;
+        javax.swing.JLabel lblCambio = new javax.swing.JLabel("Cambio / Vueltos:");
+        lblCambio.setFont(fontLabel);
+        lblCambio.setForeground(slate300);
+        dialog.add(lblCambio, gbc);
+        
+        gbc.gridx = 1;
+        final javax.swing.JLabel lblCambioVal = new javax.swing.JLabel("COP 0.00");
+        lblCambioVal.setFont(fontBig);
+        lblCambioVal.setForeground(new java.awt.Color(234, 179, 8)); // Yellow/Amber
+        dialog.add(lblCambioVal, gbc);
+        
+        // Pre-fill logic based on Room
+        String salaActual = txtSalaFinalizar.getText();
+        if (salaActual.equalsIgnoreCase("EFECTIVO")) {
+            txtEfectivo.setText(String.format(java.util.Locale.US, "%.0f", totalConsumo));
+            txtTrans.setText("0");
+        } else if (salaActual.equalsIgnoreCase("TRANSACCIONES")) {
+            txtEfectivo.setText("0");
+            txtTrans.setText(String.format(java.util.Locale.US, "%.0f", totalConsumo));
+        } else {
+            txtEfectivo.setText("0");
+            txtTrans.setText("0");
+        }
+        
+        final Runnable recalcularCambio = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    double ef = parseDoubleSafe(txtEfectivo.getText());
+                    double tr = parseDoubleSafe(txtTrans.getText());
+                    double totalPagado = ef + tr;
+                    double cambio = totalPagado - totalConsumo;
+                    if (cambio < 0) {
+                        lblCambioVal.setText("Restante: " + String.format("COP %,.2f", Math.abs(cambio)));
+                        lblCambioVal.setForeground(new java.awt.Color(239, 68, 68)); // Red
+                    } else {
+                        lblCambioVal.setText(String.format("COP %,.2f", cambio));
+                        lblCambioVal.setForeground(new java.awt.Color(34, 197, 94)); // Green
+                    }
+                } catch (NumberFormatException ex) {
+                    lblCambioVal.setText("Valor inválido");
+                    lblCambioVal.setForeground(new java.awt.Color(239, 68, 68));
+                }
+            }
+        };
+        
+        javax.swing.event.DocumentListener dl = new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { recalcularCambio.run(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { recalcularCambio.run(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { recalcularCambio.run(); }
+        };
+        txtEfectivo.getDocument().addDocumentListener(dl);
+        txtTrans.getDocument().addDocumentListener(dl);
+        
+        recalcularCambio.run();
+        
+        // Quick Actions
+        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2;
+        javax.swing.JPanel pnlQuick = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 5, 5));
+        pnlQuick.setBackground(new java.awt.Color(15, 23, 42));
+        
+        javax.swing.JButton btnQuickEf = new javax.swing.JButton("Todo en Efectivo");
+        btnQuickEf.setBackground(slate700);
+        btnQuickEf.setForeground(slate100);
+        btnQuickEf.addActionListener(new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                txtEfectivo.setText(String.format(java.util.Locale.US, "%.0f", totalConsumo));
+                txtTrans.setText("0");
+                recalcularCambio.run();
+            }
+        });
+        pnlQuick.add(btnQuickEf);
+        
+        javax.swing.JButton btnQuickTr = new javax.swing.JButton("Todo en Transferencia");
+        btnQuickTr.setBackground(slate700);
+        btnQuickTr.setForeground(slate100);
+        btnQuickTr.addActionListener(new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                txtEfectivo.setText("0");
+                txtTrans.setText(String.format(java.util.Locale.US, "%.0f", totalConsumo));
+                recalcularCambio.run();
+            }
+        });
+        pnlQuick.add(btnQuickTr);
+        dialog.add(pnlQuick, gbc);
+        
+        // Action Buttons
+        gbc.gridx = 0; gbc.gridy = 5; gbc.gridwidth = 2;
+        javax.swing.JPanel pnlActions = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 10, 10));
+        pnlActions.setBackground(new java.awt.Color(15, 23, 42));
+        
+        final javax.swing.JButton btnAceptar = new javax.swing.JButton("Finalizar y Facturar");
+        btnAceptar.setBackground(new java.awt.Color(34, 197, 94));
+        btnAceptar.setForeground(slate100);
+        btnAceptar.setFont(fontLabel);
+        
+        final javax.swing.JButton btnCancelar = new javax.swing.JButton("Cancelar");
+        btnCancelar.setBackground(new java.awt.Color(239, 68, 68));
+        btnCancelar.setForeground(slate100);
+        btnCancelar.setFont(fontLabel);
+        
+        pnlActions.add(btnAceptar);
+        pnlActions.add(btnCancelar);
+        dialog.add(pnlActions, gbc);
+        
+        btnAceptar.addActionListener(new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent event) {
+                try {
+                    final double ef = parseDoubleSafe(txtEfectivo.getText());
+                    final double tr = parseDoubleSafe(txtTrans.getText());
+                    if (ef + tr < totalConsumo) {
+                        JOptionPane.showMessageDialog(dialog, "Monto insuficiente. Faltan COP " + String.format("%,.2f", (totalConsumo - (ef + tr))), "Error", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                    
+                    dialog.dispose();
+                    
+                    btnFinalizar.setEnabled(false);
+                    btnFinalizar.setText("⏳ Procesando...");
+                    new javax.swing.SwingWorker<Boolean, Void>() {
+                        @Override
+                        protected Boolean doInBackground() {
+                            boolean ok = pedDao.finalizarPedidoConPago(idPedido, ef, tr);
+                            if (ok) {
+                                pedDao.pdfPedido(idPedido);
+                                try {
+                                    Modelo.ImpresionTicket impresion = new Modelo.ImpresionTicket();
+                                    impresion.imprimirTicket(idPedido, tableFinalizar);
+                                } catch (Exception ex) {
+                                    System.out.println("Error al imprimir ticket: " + ex.getMessage());
+                                }
+                                PedidosDao pedidosDao = new PedidosDao();
+                                pedidosDao.generarReporteDiario();
+                            }
+                            return ok;
+                        }
+                        
+                        @Override
+                        protected void done() {
+                            try {
+                                boolean ok = get();
+                                btnFinalizar.setEnabled(true);
+                                btnFinalizar.setText("Finalizar");
+                                if (ok) {
+                                    LimpiarTable();
+                                    ListarPedidos();
+                                    actualizarTotalDia();
+                                    double vueltos = (ef + tr) - totalConsumo;
+                                    String msg = "✅ Pedido finalizado correctamente.";
+                                    if (vueltos > 0) {
+                                        msg += "\nCambio/Vueltos a entregar: COP " + String.format("%,.2f", vueltos);
+                                    }
+                                    JOptionPane.showMessageDialog(Sistema.this, msg, "Éxito", JOptionPane.INFORMATION_MESSAGE);
+                                } else {
+                                    JOptionPane.showMessageDialog(Sistema.this, "Error al finalizar el pedido.", "Error", JOptionPane.ERROR_MESSAGE);
+                                }
+                            } catch (Exception e) {
+                                btnFinalizar.setEnabled(true);
+                                btnFinalizar.setText("Finalizar");
+                                JOptionPane.showMessageDialog(Sistema.this, "Error inesperado: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                            }
+                        }
+                    }.execute();
+                } catch (NumberFormatException ex) {
+                    JOptionPane.showMessageDialog(dialog, "Por favor ingrese valores numéricos válidos.", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+        
+        btnCancelar.addActionListener(new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                dialog.dispose();
+            }
+        });
+        
+        dialog.pack();
+        dialog.setSize(450, 320);
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
     }//GEN-LAST:event_btnFinalizarActionPerformed
 
     private void btnEliminarTempPlatoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEliminarTempPlatoActionPerformed
@@ -2163,18 +2505,24 @@ public final class Sistema extends javax.swing.JFrame {
     }//GEN-LAST:event_btnNuevoSalaActionPerformed
 
     private void btnActualizarSalaActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnActualizarSalaActionPerformed
-        // TODO add your handling code here:
         if ("".equals(txtIdSala.getText())) {
-            JOptionPane.showMessageDialog(null, "Seleecione una fila");
+            JOptionPane.showMessageDialog(null, "Seleccione una fila");
         } else {
-            if (!"".equals(txtNombreSala.getText())) {
-                sl.setNombre(txtNombreSala.getText());
-                sl.setId(Integer.parseInt(txtIdSala.getText()));
-                slDao.Modificar(sl);
-                JOptionPane.showMessageDialog(null, "Sala Modificado");
-                LimpiarSala();
-                LimpiarTable();
-                ListarSalas();
+            if (!"".equals(txtNombreSala.getText()) && !"".equals(txtMesas.getText())) {
+                try {
+                    sl.setNombre(txtNombreSala.getText());
+                    sl.setMesas(Integer.parseInt(txtMesas.getText()));
+                    sl.setId(Integer.parseInt(txtIdSala.getText()));
+                    slDao.Modificar(sl);
+                    JOptionPane.showMessageDialog(null, "Sala actualizada correctamente");
+                    LimpiarSala();
+                    LimpiarTable();
+                    ListarSalas();
+                } catch (NumberFormatException e) {
+                    JOptionPane.showMessageDialog(null, "El número de mesas debe ser un entero válido");
+                }
+            } else {
+                JOptionPane.showMessageDialog(null, "Complete todos los campos (Nombre y Mesas)");
             }
         }
     }//GEN-LAST:event_btnActualizarSalaActionPerformed
@@ -2279,100 +2627,11 @@ public final class Sistema extends javax.swing.JFrame {
     }//GEN-LAST:event_btnEliminarPedidoActionPerformed
 
     private void btnTransaccionActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnTransaccionActionPerformed
-        if (txtIdPedido.getText().isEmpty()) {
-            JOptionPane.showMessageDialog(this, "No hay pedido seleccionado", "Advertencia", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        String montoInput = JOptionPane.showInputDialog(this, "Ingrese el monto de la transacción:", "Monto Transacción", JOptionPane.PLAIN_MESSAGE);
-        if (montoInput == null || montoInput.trim().isEmpty()) {
-            JOptionPane.showMessageDialog(this, "No se ingresó un monto.", "Advertencia", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        try {
-            double monto = Double.parseDouble(montoInput.trim());
-            if (monto <= 0) {
-                JOptionPane.showMessageDialog(this, "El monto debe ser mayor a 0.", "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-
-            int idPedido = Integer.parseInt(txtIdPedido.getText());
-            String comentario = "TRANSACCION - $" + String.format("%.2f", monto);
-            DetallePedido det = new DetallePedido();
-            det.setNombre("PAGO TRANSACCION");
-            det.setPrecio(monto);
-            det.setCantidad(1);
-            det.setComentario(comentario);
-            det.setId_pedido(idPedido);
-
-            if (pedDao.RegistrarDetalle(det)) {
-                modelo = (DefaultTableModel) tableFinalizar.getModel();
-                Object[] fila = new Object[6];
-                fila[0] = det.getId(); // ID del detalle (puede ser 0 si no se usa)
-                fila[1] = "PAGO TRANSACCION";
-                fila[2] = 1;
-                fila[3] = monto;
-                fila[4] = monto;
-                fila[5] = comentario;
-                modelo.addRow(fila);
-                TotalPagar(tableFinalizar, totalFinalizar);
-                JOptionPane.showMessageDialog(this, "Pago por transacción añadido.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
-            } else {
-                JOptionPane.showMessageDialog(this, "Error al registrar el pago por transacción.", "Error", JOptionPane.ERROR_MESSAGE);
-            }
-        } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this, "El monto debe ser un número válido.", "Error", JOptionPane.ERROR_MESSAGE);
-        }
+        btnFinalizarActionPerformed(evt);
     }//GEN-LAST:event_btnTransaccionActionPerformed
 
     private void btnEfectivoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEfectivoActionPerformed
-
-        if (txtIdPedido.getText().isEmpty()) {
-            JOptionPane.showMessageDialog(this, "No hay pedido seleccionado", "Advertencia", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        String montoInput = JOptionPane.showInputDialog(this, "Ingrese el monto en efectivo:", "Monto Efectivo", JOptionPane.PLAIN_MESSAGE);
-        if (montoInput == null || montoInput.trim().isEmpty()) {
-            JOptionPane.showMessageDialog(this, "No se ingresó un monto.", "Advertencia", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        try {
-            double monto = Double.parseDouble(montoInput.trim());
-            if (monto <= 0) {
-                JOptionPane.showMessageDialog(this, "El monto debe ser mayor a 0.", "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-
-            int idPedido = Integer.parseInt(txtIdPedido.getText());
-            String comentario = "EFECTIVO - $" + String.format("%.2f", monto);
-            DetallePedido det = new DetallePedido();
-            det.setNombre("PAGO EFECTIVO");
-            det.setPrecio(monto);
-            det.setCantidad(1);
-            det.setComentario(comentario);
-            det.setId_pedido(idPedido);
-
-            if (pedDao.RegistrarDetalle(det)) {
-                modelo = (DefaultTableModel) tableFinalizar.getModel();
-                Object[] fila = new Object[6];
-                fila[0] = det.getId(); // ID del detalle (puede ser 0 si no se usa)
-                fila[1] = "PAGO EFECTIVO";
-                fila[2] = 1;
-                fila[3] = monto;
-                fila[4] = monto;
-                fila[5] = comentario;
-                modelo.addRow(fila);
-                TotalPagar(tableFinalizar, totalFinalizar);
-                JOptionPane.showMessageDialog(this, "Pago en efectivo añadido.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
-            } else {
-                JOptionPane.showMessageDialog(this, "Error al registrar el pago en efectivo.", "Error", JOptionPane.ERROR_MESSAGE);
-            }
-        } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this, "El monto debe ser un número válido.", "Error", JOptionPane.ERROR_MESSAGE);
-        }
+        btnFinalizarActionPerformed(evt);
     }//GEN-LAST:event_btnEfectivoActionPerformed
 
     private void jComboSalasActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jComboSalasActionPerformed
@@ -2750,6 +3009,18 @@ public final class Sistema extends javax.swing.JFrame {
     private javax.swing.JTable tableMenu;
     private javax.swing.JTable tableSala;
     private javax.swing.JTable tblTemPlatos;
+    private javax.swing.JPanel panelCardPlatos;
+    private javax.swing.JPanel gridPanelPlatos;
+    private javax.swing.JPanel panelDashboard;
+    private javax.swing.JButton btnToggleHistorial;
+    private javax.swing.JButton btnToggleDashboard;
+    private javax.swing.JLabel lblEfectivoVal;
+    private javax.swing.JLabel lblTransVal;
+    private javax.swing.JLabel lblTotalVal;
+    private javax.swing.JLabel lblEfectivoSub;
+    private javax.swing.JLabel lblTransSub;
+    private SalesTrendChart chartVentasHora;
+    private TopDishesChart chartPlatosMasVendidos;
     private javax.swing.JLabel tipo;
     private javax.swing.JLabel totalFinalizar;
     private javax.swing.JLabel totalMenu;
@@ -2783,13 +3054,28 @@ public final class Sistema extends javax.swing.JFrame {
     // End of variables declaration//GEN-END:variables
 
     private void TotalPagar(JTable tabla, JLabel label) {
-        Totalpagar = 0.00;
+        double consumo = 0.0;
+        double pagado = 0.0;
         int numFila = tabla.getRowCount();
+        boolean esFinalizar = (tabla == tableFinalizar);
+
         for (int i = 0; i < numFila; i++) {
-            double cal = Double.parseDouble(String.valueOf(tabla.getModel().getValueAt(i, 4)));
-            Totalpagar += cal;
+            String nombre = tabla.getValueAt(i, 1).toString();
+            double subtotal = Double.parseDouble(tabla.getValueAt(i, 4).toString());
+            if (nombre.equals("PAGO EFECTIVO") || nombre.equals("PAGO TRANSACCION")) {
+                pagado += subtotal;
+            } else {
+                consumo += subtotal;
+            }
         }
-        label.setText(String.format("%.2f", Totalpagar));
+
+        if (esFinalizar) {
+            label.setText(String.format("%,.2f", consumo));
+            Totalpagar = consumo;
+        } else {
+            Totalpagar = consumo;
+            label.setText(String.format("%.2f", Totalpagar));
+        }
     }
 
     private void LimpiarTableMenu() {
@@ -2925,14 +3211,14 @@ public final class Sistema extends javax.swing.JFrame {
 
     private void decorarSistemaUI() {
         // --- 1. Cabecera (Header) y Reloj ---
-        jLabel38.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 26));
+        jLabel38.setFont(getFontBold(26f));
         jLabel38.setForeground(new java.awt.Color(241, 245, 249)); // Slate claro
         jLabel38.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
 
         // --- 2. Barra Lateral (Sidebar) Botones ---
         javax.swing.JButton[] btns = {btnSala, btnVentas, btnConfig, btnUsuarios, btnPlatos};
         for (javax.swing.JButton btn : btns) {
-            btn.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 14));
+            btn.setFont(getFontBold(14f));
             btn.setForeground(java.awt.Color.WHITE);
             btn.setBorderPainted(false);
             btn.setContentAreaFilled(false);
@@ -2958,7 +3244,7 @@ public final class Sistema extends javax.swing.JFrame {
         }
 
         // Cerrar sesión
-        BtnCerrarSesion.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 12));
+        BtnCerrarSesion.setFont(getFontBold(12f));
         BtnCerrarSesion.setForeground(new java.awt.Color(254, 226, 226)); // Rojo claro
         BtnCerrarSesion.setBorderPainted(false);
         BtnCerrarSesion.setContentAreaFilled(false);
@@ -2983,7 +3269,7 @@ public final class Sistema extends javax.swing.JFrame {
         javax.swing.JTable[] tablas = {tableSala, TableUsuarios, TablePlatos, TablePedidos, tableMenu, tableFinalizar, tblTemPlatos};
         for (javax.swing.JTable t : tablas) {
             javax.swing.table.JTableHeader header = t.getTableHeader();
-            header.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 13));
+            header.setFont(getFontBold(13f));
             header.setBackground(new java.awt.Color(15, 23, 42)); // Azul oscuro pizarra
             header.setForeground(java.awt.Color.WHITE);
             header.setReorderingAllowed(false);
@@ -2994,7 +3280,7 @@ public final class Sistema extends javax.swing.JFrame {
                     java.awt.Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
                     c.setBackground(new java.awt.Color(15, 23, 42));
                     c.setForeground(java.awt.Color.WHITE);
-                    setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 13));
+                    setFont(getFontBold(13f));
                     setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
                     setBorder(javax.swing.BorderFactory.createMatteBorder(0, 0, 1, 1, new java.awt.Color(51, 65, 85)));
                     return c;
@@ -3005,7 +3291,7 @@ public final class Sistema extends javax.swing.JFrame {
         // --- 4. Inputs (JTextFields) Modernos en Modo Oscuro ---
         javax.swing.JTextField[] camposInput = {txtNombreSala, txtMesas, txtTelefonoConfig, txtDireccionConfig, txtMensaje, txtRucConfig, txtNombreConfig, txtCorreo, txtPass, txtNombre, txtNombrePlato, txtPrecioPlato, txtBuscarPlato};
         for (javax.swing.JTextField tf : camposInput) {
-            tf.setFont(new java.awt.Font("Segoe UI", java.awt.Font.PLAIN, 14));
+            tf.setFont(getFontRegular(14f));
             tf.setBackground(new java.awt.Color(51, 65, 85)); // Slate 700
             tf.setForeground(java.awt.Color.WHITE);
             tf.setCaretColor(new java.awt.Color(96, 165, 250)); // Azul brillante
@@ -3034,7 +3320,7 @@ public final class Sistema extends javax.swing.JFrame {
         }
 
         // --- 5. JComboBox Moderno ---
-        cbxRol.setFont(new java.awt.Font("Segoe UI", java.awt.Font.PLAIN, 14));
+        cbxRol.setFont(getFontRegular(14f));
         cbxRol.setBackground(new java.awt.Color(51, 65, 85)); // Slate 700
         cbxRol.setForeground(java.awt.Color.WHITE);
 
@@ -3052,7 +3338,7 @@ public final class Sistema extends javax.swing.JFrame {
         // Registrar/Guardar (Verde)
         javax.swing.JButton[] successBtns = {btnRegistrarSala, btnIniciar, btnGuardarPlato, btnActualizarConfig};
         for (javax.swing.JButton btn : successBtns) {
-            btn.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 13));
+            btn.setFont(getFontBold(13f));
             btn.setForeground(java.awt.Color.WHITE);
             btn.setBackground(new java.awt.Color(16, 185, 129)); // Emerald 500
             btn.setBorder(new RoundedBorder(8, new java.awt.Color(16, 185, 129), new java.awt.Insets(6, 12, 6, 12)));
@@ -3075,7 +3361,7 @@ public final class Sistema extends javax.swing.JFrame {
         // Modificar/Editar (Azul)
         javax.swing.JButton[] infoBtns = {btnActualizarSala, btnEditarPlato, btnNuevoPlato, btnNuevoSala, btnModificarUsua};
         for (javax.swing.JButton btn : infoBtns) {
-            btn.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 13));
+            btn.setFont(getFontBold(13f));
             btn.setForeground(java.awt.Color.WHITE);
             btn.setBackground(new java.awt.Color(59, 130, 246)); // Blue 500
             btn.setBorder(new RoundedBorder(8, new java.awt.Color(59, 130, 246), new java.awt.Insets(6, 12, 6, 12)));
@@ -3098,7 +3384,7 @@ public final class Sistema extends javax.swing.JFrame {
         // Eliminar (Rojo)
         javax.swing.JButton[] dangerBtns = {btnEliminarSala, btnEliminarPlato, btnEliminarPlatoFinalizar, btnEliminarPedido};
         for (javax.swing.JButton btn : dangerBtns) {
-            btn.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 13));
+            btn.setFont(getFontBold(13f));
             btn.setForeground(java.awt.Color.WHITE);
             btn.setBackground(new java.awt.Color(239, 68, 68)); // Red 500
             btn.setBorder(new RoundedBorder(8, new java.awt.Color(239, 68, 68), new java.awt.Insets(6, 12, 6, 12)));
@@ -3119,14 +3405,14 @@ public final class Sistema extends javax.swing.JFrame {
         }
 
         // Botones Especiales de Venta (Efectivo / Transacción)
-        btnEfectivo.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 14));
+        btnEfectivo.setFont(getFontBold(14f));
         btnEfectivo.setForeground(java.awt.Color.WHITE);
         btnEfectivo.setBackground(new java.awt.Color(16, 185, 129));
         btnEfectivo.setBorder(new RoundedBorder(10, new java.awt.Color(16, 185, 129), new java.awt.Insets(8, 16, 8, 16)));
         btnEfectivo.setOpaque(true);
         btnEfectivo.setContentAreaFilled(false);
 
-        btnTransaccion.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 14));
+        btnTransaccion.setFont(getFontBold(14f));
         btnTransaccion.setForeground(java.awt.Color.WHITE);
         btnTransaccion.setBackground(new java.awt.Color(59, 130, 246));
         btnTransaccion.setBorder(new RoundedBorder(10, new java.awt.Color(59, 130, 246), new java.awt.Insets(8, 16, 8, 16)));
@@ -3168,11 +3454,25 @@ public final class Sistema extends javax.swing.JFrame {
                 }
             }
         }
+
+        // --- 10. Catálogo Visual de Platos (Grid de Tarjetas) ---
+        panelCardPlatos = new javax.swing.JPanel(new java.awt.BorderLayout());
+        panelCardPlatos.setBackground(new java.awt.Color(15, 23, 42)); // Slate 900
+        gridPanelPlatos = new javax.swing.JPanel(new java.awt.GridLayout(0, 2, 8, 8));
+        gridPanelPlatos.setBackground(new java.awt.Color(15, 23, 42));
+        gridPanelPlatos.setBorder(javax.swing.BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        panelCardPlatos.add(gridPanelPlatos, java.awt.BorderLayout.NORTH);
+        jScrollPane10.setViewportView(panelCardPlatos);
+        jScrollPane10.getVerticalScrollBar().setUnitIncrement(16);
+
+        // --- 11. Dashboard de Ventas ---
+        initDashboard();
     }
 
     private void styleComponentsRecursively(java.awt.Container container) {
         java.awt.Color bgDark = new java.awt.Color(15, 23, 42); // Slate 900
         java.awt.Color bgCard = new java.awt.Color(30, 41, 59); // Slate 800
+        java.awt.Color bgInput = new java.awt.Color(51, 65, 85); // Slate 700
         java.awt.Color textLight = new java.awt.Color(241, 245, 249); // Slate 100
 
         for (java.awt.Component child : container.getComponents()) {
@@ -3188,7 +3488,7 @@ public final class Sistema extends javax.swing.JFrame {
             } else if (child instanceof javax.swing.JLabel) {
                 if (child.getParent() != jPanel1 && child != jLabel38) {
                     child.setForeground(textLight);
-                    child.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 13));
+                    child.setFont(getFontBold(13f));
                 }
             } else if (child instanceof javax.swing.JScrollPane) {
                 child.setBackground(bgDark);
@@ -3197,6 +3497,27 @@ public final class Sistema extends javax.swing.JFrame {
                 sp.setBorder(javax.swing.BorderFactory.createEmptyBorder());
             } else if (child instanceof javax.swing.JViewport) {
                 child.setBackground(bgDark);
+            } else if (child instanceof javax.swing.JTable) {
+                child.setBackground(bgDark);
+                child.setForeground(textLight);
+                ((javax.swing.JTable) child).setFont(getFontRegular(14f));
+                ((javax.swing.JTable) child).setGridColor(new java.awt.Color(51, 65, 85)); // Slate 700
+            } else if (child instanceof javax.swing.JTextField || child instanceof javax.swing.JPasswordField) {
+                child.setBackground(bgInput);
+                child.setForeground(textLight);
+                child.setFont(getFontRegular(14f));
+                if (child instanceof javax.swing.JTextField) {
+                    ((javax.swing.JTextField) child).setCaretColor(new java.awt.Color(96, 165, 250));
+                }
+            } else if (child instanceof javax.swing.JTextPane) {
+                child.setBackground(bgInput);
+                child.setForeground(textLight);
+                child.setFont(getFontRegular(14f));
+                ((javax.swing.JTextPane) child).setCaretColor(new java.awt.Color(96, 165, 250));
+            } else if (child instanceof javax.swing.JComboBox) {
+                child.setBackground(bgInput);
+                child.setForeground(textLight);
+                child.setFont(getFontRegular(14f));
             }
             if (child instanceof java.awt.Container) {
                 styleComponentsRecursively((java.awt.Container) child);
@@ -3426,6 +3747,16 @@ public final class Sistema extends javax.swing.JFrame {
             modelo.addRow(ob);
         }
         colorHeader(tabla);
+
+        // Poblar el Grid de Tarjetas Visuales
+        if (gridPanelPlatos != null) {
+            gridPanelPlatos.removeAll();
+            for (Platos pl : Listar) {
+                gridPanelPlatos.add(crearTarjetaPlato(pl.getId(), pl.getNombre(), pl.getPrecio()));
+            }
+            gridPanelPlatos.revalidate();
+            gridPanelPlatos.repaint();
+        }
     }
 
     //registrar pedido
@@ -3515,31 +3846,23 @@ public final class Sistema extends javax.swing.JFrame {
             @Override
             protected double[] doInBackground() {
                 java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-                java.util.Calendar cal = java.util.Calendar.getInstance();
-                java.util.Calendar ci = (java.util.Calendar) cal.clone();
-                java.util.Calendar cf = (java.util.Calendar) cal.clone();
-                if (cal.get(java.util.Calendar.HOUR_OF_DAY) < 16) {
-                    ci.add(java.util.Calendar.DAY_OF_MONTH, -1);
-                    ci.set(java.util.Calendar.HOUR_OF_DAY, 16);
-                    ci.set(java.util.Calendar.MINUTE, 0);
-                    ci.set(java.util.Calendar.SECOND, 0);
-                    cf.set(java.util.Calendar.HOUR_OF_DAY, 4);
-                    cf.set(java.util.Calendar.MINUTE, 0);
-                    cf.set(java.util.Calendar.SECOND, 0);
+                LocalDateTime ahora = LocalDateTime.now(ZoneId.of("America/Lima"));
+                LocalDateTime inicio, fin;
+                if (ahora.getHour() < 4) {
+                    inicio = ahora.minusDays(1).withHour(16).withMinute(0).withSecond(0).withNano(0);
+                    fin = ahora;
+                } else if (ahora.getHour() < 16) {
+                    inicio = ahora.minusDays(1).withHour(16).withMinute(0).withSecond(0).withNano(0);
+                    fin = ahora;
                 } else {
-                    ci.set(java.util.Calendar.HOUR_OF_DAY, 16);
-                    ci.set(java.util.Calendar.MINUTE, 0);
-                    ci.set(java.util.Calendar.SECOND, 0);
-                    cf.add(java.util.Calendar.DAY_OF_MONTH, 1);
-                    cf.set(java.util.Calendar.HOUR_OF_DAY, 4);
-                    cf.set(java.util.Calendar.MINUTE, 0);
-                    cf.set(java.util.Calendar.SECOND, 0);
+                    inicio = ahora.withHour(16).withMinute(0).withSecond(0).withNano(0);
+                    fin = ahora;
                 }
-                Timestamp inicio = new Timestamp(ci.getTimeInMillis());
-                Timestamp fin = new Timestamp(cf.getTimeInMillis());
-                rangoTexto = sdf.format(inicio) + " a " + sdf.format(fin);
+                Timestamp inicioTS = Timestamp.valueOf(inicio);
+                Timestamp finTS = Timestamp.valueOf(fin);
+                rangoTexto = sdf.format(inicioTS) + " a " + sdf.format(finTS);
                 PedidosDao pedidosDao = new PedidosDao();
-                return pedidosDao.calcularTotalesDia(inicio, fin, 0);
+                return pedidosDao.calcularTotalesDia(inicioTS, finTS, 0);
             }
             @Override
             protected void done() {
@@ -3554,6 +3877,22 @@ public final class Sistema extends javax.swing.JFrame {
                 }
             }
         }.execute();
+    }
+
+    private double parseDoubleSafe(String text) {
+        if (text == null) return 0.0;
+        text = text.trim();
+        if (text.isEmpty()) return 0.0;
+        try {
+            if (text.contains(",") && (text.indexOf(",") > text.indexOf("."))) {
+                text = text.replace(".", "").replace(",", ".");
+            } else {
+                text = text.replace(",", "");
+            }
+            return Double.parseDouble(text);
+        } catch (NumberFormatException e) {
+            return 0.0;
+        }
     }
 
     private void cargarPedidosDelDia() {
@@ -3646,4 +3985,555 @@ public final class Sistema extends javax.swing.JFrame {
             modelo.addRow(fila);
         }
     }
+
+    // ─── Catálogo Visual: Crear Tarjeta de Plato ─────────────────────────────
+    private javax.swing.JPanel crearTarjetaPlato(int id, String nombre, double precio) {
+        javax.swing.JPanel card = new javax.swing.JPanel() {
+            @Override
+            protected void paintComponent(java.awt.Graphics g) {
+                java.awt.Graphics2D g2 = (java.awt.Graphics2D) g.create();
+                g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(getBackground());
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 14, 14);
+                g2.dispose();
+            }
+        };
+        card.setLayout(new java.awt.BorderLayout(6, 4));
+        card.setBackground(new java.awt.Color(30, 41, 59)); // Slate 800
+        card.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 12, 10, 10));
+        card.setOpaque(false);
+        card.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
+        card.setPreferredSize(new java.awt.Dimension(180, 70));
+
+        // Color de acento según rango de precio
+        java.awt.Color accentColor;
+        if (precio < 8000) {
+            accentColor = new java.awt.Color(96, 165, 250);   // Azul (económico)
+        } else if (precio < 20000) {
+            accentColor = new java.awt.Color(52, 211, 153);   // Verde (estándar)
+        } else {
+            accentColor = new java.awt.Color(251, 191, 36);   // Ámbar (premium)
+        }
+
+        // Barra lateral de acento
+        javax.swing.JPanel accentBar = new javax.swing.JPanel() {
+            @Override
+            protected void paintComponent(java.awt.Graphics g) {
+                java.awt.Graphics2D g2 = (java.awt.Graphics2D) g.create();
+                g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(accentColor);
+                g2.fillRoundRect(0, 4, getWidth(), getHeight() - 8, 4, 4);
+                g2.dispose();
+            }
+        };
+        accentBar.setPreferredSize(new java.awt.Dimension(4, 0));
+        accentBar.setOpaque(false);
+        card.add(accentBar, java.awt.BorderLayout.WEST);
+
+        // Panel de texto
+        javax.swing.JPanel textPanel = new javax.swing.JPanel();
+        textPanel.setLayout(new javax.swing.BoxLayout(textPanel, javax.swing.BoxLayout.Y_AXIS));
+        textPanel.setOpaque(false);
+        textPanel.setBorder(javax.swing.BorderFactory.createEmptyBorder(2, 6, 2, 0));
+
+        javax.swing.JLabel lblNombre = new javax.swing.JLabel(nombre);
+        lblNombre.setFont(getFontBold(13f));
+        lblNombre.setForeground(new java.awt.Color(241, 245, 249)); // Slate 100
+        lblNombre.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
+        textPanel.add(lblNombre);
+        textPanel.add(javax.swing.Box.createVerticalStrut(3));
+
+        javax.swing.JLabel lblPrecio = new javax.swing.JLabel(String.format("$%,.0f", precio));
+        lblPrecio.setFont(getFontBold(12f));
+        lblPrecio.setForeground(accentColor);
+        lblPrecio.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
+        textPanel.add(lblPrecio);
+
+        card.add(textPanel, java.awt.BorderLayout.CENTER);
+
+        // Icono '+' a la derecha
+        javax.swing.JLabel lblAdd = new javax.swing.JLabel("+");
+        lblAdd.setFont(getFontBold(20f));
+        lblAdd.setForeground(new java.awt.Color(71, 85, 105)); // Slate 600
+        lblAdd.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        lblAdd.setPreferredSize(new java.awt.Dimension(28, 28));
+        card.add(lblAdd, java.awt.BorderLayout.EAST);
+
+        // Efectos de hover y click
+        card.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                card.setBackground(new java.awt.Color(51, 65, 85)); // Slate 700
+                lblAdd.setForeground(java.awt.Color.WHITE);
+                card.repaint();
+            }
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                card.setBackground(new java.awt.Color(30, 41, 59));
+                lblAdd.setForeground(new java.awt.Color(71, 85, 105));
+                card.repaint();
+            }
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent evt) {
+                agregarPlatoDirecto(id, nombre, precio);
+                card.setBackground(new java.awt.Color(71, 85, 105)); // Slate 500 - feedback táctil
+                card.repaint();
+            }
+            @Override
+            public void mouseReleased(java.awt.event.MouseEvent evt) {
+                card.setBackground(new java.awt.Color(51, 65, 85));
+                card.repaint();
+            }
+        });
+
+        return card;
+    }
+
+    // ─── Agregar plato directamente desde tarjeta ────────────────────────────
+    private void agregarPlatoDirecto(int id, String descripcion, double precio) {
+        double total = 1 * precio;
+        item = item + 1;
+        tmp = (DefaultTableModel) tableMenu.getModel();
+        for (int i = 0; i < tableMenu.getRowCount(); i++) {
+            if (tableMenu.getValueAt(i, 0).equals(id)) {
+                int cantActual = Integer.parseInt(tableMenu.getValueAt(i, 2).toString());
+                int nuevoCantidad = cantActual + 1;
+                double nuevoSub = precio * nuevoCantidad;
+                tmp.setValueAt(nuevoCantidad, i, 2);
+                tmp.setValueAt(nuevoSub, i, 4);
+                TotalPagar(tableMenu, totalMenu);
+                return;
+            }
+        }
+        Object[] O = new Object[6];
+        O[0] = id;
+        O[1] = descripcion;
+        O[2] = 1;
+        O[3] = precio;
+        O[4] = total;
+        O[5] = "";
+        tmp.addRow(O);
+        tableMenu.setModel(tmp);
+        TotalPagar(tableMenu, totalMenu);
+    }
+
+    private static Font outfitRegular = null;
+    private static Font outfitBold = null;
+    private static boolean fontsAttempted = false;
+
+    private static void loadFonts() {
+        if (fontsAttempted) return;
+        fontsAttempted = true;
+        try {
+            java.io.InputStream regStream = Sistema.class.getResourceAsStream("/Img/Outfit-Regular.ttf");
+            if (regStream != null) {
+                outfitRegular = Font.createFont(Font.TRUETYPE_FONT, regStream);
+                java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(outfitRegular);
+            }
+            java.io.InputStream boldStream = Sistema.class.getResourceAsStream("/Img/Outfit-Bold.ttf");
+            if (boldStream != null) {
+                outfitBold = Font.createFont(Font.TRUETYPE_FONT, boldStream);
+                java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(outfitBold);
+            }
+        } catch (Exception e) {
+            System.out.println("Fuentes Outfit no disponibles, usando fuente del sistema: " + e.getMessage());
+        }
+    }
+
+    public static Font getFontRegular(float size) {
+        loadFonts();
+        if (outfitRegular != null) {
+            return outfitRegular.deriveFont(Font.PLAIN, size);
+        }
+        return new Font("Segoe UI", Font.PLAIN, (int) size);
+    }
+
+    public static Font getFontBold(float size) {
+        loadFonts();
+        if (outfitBold != null) {
+            return outfitBold.deriveFont(Font.BOLD, size);
+        }
+        return new Font("Segoe UI", Font.BOLD, (int) size);
+    }
+
+    // ==================== DASHBOARD DE VENTAS ====================
+
+    private javax.swing.JPanel crearCardMetrica(final Color accentColor) {
+        javax.swing.JPanel card = new javax.swing.JPanel(null) {
+            @Override
+            protected void paintComponent(java.awt.Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(30, 41, 59));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 16, 16);
+                g2.setColor(new Color(accentColor.getRed(), accentColor.getGreen(), accentColor.getBlue(), 150));
+                g2.setStroke(new BasicStroke(2.0f));
+                g2.drawRoundRect(1, 1, getWidth() - 2, getHeight() - 2, 16, 16);
+                g2.setColor(new Color(accentColor.getRed(), accentColor.getGreen(), accentColor.getBlue(), 20));
+                g2.fillOval(getWidth() - 55, getHeight() - 55, 80, 80);
+                g2.dispose();
+            }
+        };
+        card.setOpaque(false);
+        return card;
+    }
+
+    private void initDashboard() {
+        panelDashboard = new javax.swing.JPanel(null);
+        panelDashboard.setOpaque(false);
+
+        // --- Tarjeta Efectivo ---
+        javax.swing.JPanel cEf = crearCardMetrica(new Color(16, 185, 129));
+        cEf.setBounds(0, 0, 320, 100);
+        JLabel t1 = new JLabel("\u2B50 VENTAS EFECTIVO");
+        t1.setFont(getFontRegular(11f)); t1.setForeground(new Color(148, 163, 184)); t1.setBounds(20, 12, 280, 18);
+        cEf.add(t1);
+        lblEfectivoVal = new JLabel("$0 COP");
+        lblEfectivoVal.setFont(getFontBold(22f)); lblEfectivoVal.setForeground(Color.WHITE); lblEfectivoVal.setBounds(20, 34, 280, 28);
+        cEf.add(lblEfectivoVal);
+        lblEfectivoSub = new JLabel("0% de las ventas");
+        lblEfectivoSub.setFont(getFontRegular(11f)); lblEfectivoSub.setForeground(new Color(148, 163, 184)); lblEfectivoSub.setBounds(20, 68, 280, 16);
+        cEf.add(lblEfectivoSub);
+        panelDashboard.add(cEf);
+
+        // --- Tarjeta Transacción ---
+        javax.swing.JPanel cTr = crearCardMetrica(new Color(59, 130, 246));
+        cTr.setBounds(350, 0, 320, 100);
+        JLabel t2 = new JLabel("\u2B50 VENTAS TRANSFERENCIA");
+        t2.setFont(getFontRegular(11f)); t2.setForeground(new Color(148, 163, 184)); t2.setBounds(20, 12, 280, 18);
+        cTr.add(t2);
+        lblTransVal = new JLabel("$0 COP");
+        lblTransVal.setFont(getFontBold(22f)); lblTransVal.setForeground(Color.WHITE); lblTransVal.setBounds(20, 34, 280, 28);
+        cTr.add(lblTransVal);
+        lblTransSub = new JLabel("0% de las ventas");
+        lblTransSub.setFont(getFontRegular(11f)); lblTransSub.setForeground(new Color(148, 163, 184)); lblTransSub.setBounds(20, 68, 280, 16);
+        cTr.add(lblTransSub);
+        panelDashboard.add(cTr);
+
+        // --- Tarjeta Total ---
+        javax.swing.JPanel cTo = crearCardMetrica(new Color(245, 158, 11));
+        cTo.setBounds(700, 0, 320, 100);
+        JLabel t3 = new JLabel("\u2B50 TOTAL VENTAS TURNO");
+        t3.setFont(getFontRegular(11f)); t3.setForeground(new Color(148, 163, 184)); t3.setBounds(20, 12, 280, 18);
+        cTo.add(t3);
+        lblTotalVal = new JLabel("$0 COP");
+        lblTotalVal.setFont(getFontBold(22f)); lblTotalVal.setForeground(Color.WHITE); lblTotalVal.setBounds(20, 34, 280, 28);
+        cTo.add(lblTotalVal);
+        JLabel t3s = new JLabel("Acumulado del turno activo");
+        t3s.setFont(getFontRegular(11f)); t3s.setForeground(new Color(148, 163, 184)); t3s.setBounds(20, 68, 280, 16);
+        cTo.add(t3s);
+        panelDashboard.add(cTo);
+
+        // --- Gráficos ---
+        chartVentasHora = new SalesTrendChart();
+        chartVentasHora.setBounds(0, 120, 560, 380);
+        panelDashboard.add(chartVentasHora);
+
+        chartPlatosMasVendidos = new TopDishesChart();
+        chartPlatosMasVendidos.setBounds(580, 120, 440, 380);
+        panelDashboard.add(chartPlatosMasVendidos);
+
+        // Agregar dashboard a jPanel6
+        jPanel6.add(panelDashboard, new org.netbeans.lib.awtextra.AbsoluteConstraints(30, 50, 1020, 520));
+        panelDashboard.setVisible(false);
+
+        // --- Toggle Buttons ---
+        javax.swing.JPanel toggleBar = new javax.swing.JPanel(null);
+        toggleBar.setOpaque(false);
+
+        btnToggleDashboard = new JButton("\uD83D\uDCCA Estad\u00EDsticas");
+        btnToggleDashboard.setFont(getFontBold(12f));
+        btnToggleDashboard.setFocusPainted(false);
+        btnToggleDashboard.setBorderPainted(false);
+        btnToggleDashboard.setContentAreaFilled(false);
+        btnToggleDashboard.setOpaque(true);
+        btnToggleDashboard.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btnToggleDashboard.setBounds(0, 0, 155, 30);
+
+        btnToggleHistorial = new JButton("\uD83D\uDCCB Historial");
+        btnToggleHistorial.setFont(getFontBold(12f));
+        btnToggleHistorial.setFocusPainted(false);
+        btnToggleHistorial.setBorderPainted(false);
+        btnToggleHistorial.setContentAreaFilled(false);
+        btnToggleHistorial.setOpaque(true);
+        btnToggleHistorial.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btnToggleHistorial.setBounds(160, 0, 155, 30);
+
+        actualizarEstiloToggle(false);
+
+        btnToggleDashboard.addActionListener(e -> {
+            setDashboardVisible(true);
+            actualizarEstiloToggle(true);
+            actualizarDashboardData();
+        });
+        btnToggleHistorial.addActionListener(e -> {
+            setDashboardVisible(false);
+            actualizarEstiloToggle(false);
+        });
+
+        toggleBar.add(btnToggleDashboard);
+        toggleBar.add(btnToggleHistorial);
+        jPanel6.add(toggleBar, new org.netbeans.lib.awtextra.AbsoluteConstraints(30, 12, 330, 30));
+    }
+
+    private void actualizarEstiloToggle(boolean dashActivo) {
+        Color actBg = new Color(30, 64, 175);
+        Color inBg = new Color(30, 41, 59);
+        Color actFg = Color.WHITE;
+        Color inFg = new Color(148, 163, 184);
+        btnToggleDashboard.setBackground(dashActivo ? actBg : inBg);
+        btnToggleDashboard.setForeground(dashActivo ? actFg : inFg);
+        btnToggleHistorial.setBackground(dashActivo ? inBg : actBg);
+        btnToggleHistorial.setForeground(dashActivo ? inFg : actFg);
+    }
+
+    private void setDashboardVisible(boolean visible) {
+        java.awt.Component[] histComps = {jScrollPane5, txtTotalDia, txtTotalDiaTrans, txtPedidosDia,
+            jLabel20, jLabel21, jLabel22, btnEliminarPedido, BtnImprimirDia};
+        for (java.awt.Component c : histComps) {
+            if (c != null) c.setVisible(!visible);
+        }
+        if (panelDashboard != null) panelDashboard.setVisible(visible);
+        if (visible) {
+            jLabel16.setText("Estad\u00EDsticas de Ventas");
+        } else {
+            jLabel16.setText("Historial de Pedidos del D\u00EDa");
+        }
+        jPanel6.repaint();
+    }
+
+    public void actualizarDashboardData() {
+        java.util.Calendar now = java.util.Calendar.getInstance();
+        java.util.Calendar inicio = (java.util.Calendar) now.clone();
+        java.util.Calendar fin = (java.util.Calendar) now.clone();
+        if (now.get(java.util.Calendar.HOUR_OF_DAY) < 4) {
+            inicio.add(java.util.Calendar.DAY_OF_MONTH, -1);
+            inicio.set(java.util.Calendar.HOUR_OF_DAY, 16);
+            inicio.set(java.util.Calendar.MINUTE, 0);
+            inicio.set(java.util.Calendar.SECOND, 0);
+            fin.set(java.util.Calendar.HOUR_OF_DAY, 4);
+            fin.set(java.util.Calendar.MINUTE, 0);
+            fin.set(java.util.Calendar.SECOND, 0);
+        } else {
+            inicio.set(java.util.Calendar.HOUR_OF_DAY, 16);
+            inicio.set(java.util.Calendar.MINUTE, 0);
+            inicio.set(java.util.Calendar.SECOND, 0);
+            fin.add(java.util.Calendar.DAY_OF_MONTH, 1);
+            fin.set(java.util.Calendar.HOUR_OF_DAY, 4);
+            fin.set(java.util.Calendar.MINUTE, 0);
+            fin.set(java.util.Calendar.SECOND, 0);
+        }
+        Timestamp fInicio = new Timestamp(inicio.getTimeInMillis());
+        Timestamp fFin = new Timestamp(fin.getTimeInMillis());
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        String strInicio = sdf.format(fInicio);
+        String strFin = sdf.format(fFin);
+
+        double[] totales = pedDao.calcularTotalesDia(fInicio, fFin, 0);
+        double totalEfectivo = totales[0];
+        double totalTransaccion = totales[1];
+        double totalGeneral = totalEfectivo + totalTransaccion;
+
+        DecimalFormat df = new DecimalFormat("$#,##0");
+        lblEfectivoVal.setText(df.format(totalEfectivo) + " COP");
+        lblTransVal.setText(df.format(totalTransaccion) + " COP");
+        lblTotalVal.setText(df.format(totalGeneral) + " COP");
+
+        double pctE = totalGeneral > 0 ? (totalEfectivo * 100.0 / totalGeneral) : 0;
+        double pctT = totalGeneral > 0 ? (totalTransaccion * 100.0 / totalGeneral) : 0;
+        lblEfectivoSub.setText(String.format("%.1f%% de las ventas", pctE));
+        lblTransSub.setText(String.format("%.1f%% de las ventas", pctT));
+
+        java.util.Map<String, Double> ventasHora = pedDao.obtenerVentasPorHora(strInicio, strFin);
+        chartVentasHora.setData(ventasHora);
+
+        java.util.List<Object[]> topPlatos = pedDao.obtenerPlatosMasVendidos(strInicio, strFin);
+        chartPlatosMasVendidos.setData(topPlatos);
+    }
 }
+
+// ==================== GRÁFICO: TENDENCIA DE VENTAS POR HORA ====================
+class SalesTrendChart extends javax.swing.JPanel {
+    private java.util.Map<String, Double> data = new java.util.LinkedHashMap<>();
+
+    SalesTrendChart() {
+        setOpaque(false);
+    }
+
+    void setData(java.util.Map<String, Double> data) {
+        this.data = data;
+        repaint();
+    }
+
+    @Override
+    protected void paintComponent(java.awt.Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        int w = getWidth(), h = getHeight();
+
+        g2.setColor(new Color(30, 41, 59));
+        g2.fillRoundRect(0, 0, w, h, 16, 16);
+        g2.setColor(new Color(71, 85, 105, 120));
+        g2.drawRoundRect(0, 0, w - 1, h - 1, 16, 16);
+
+        g2.setColor(Color.WHITE);
+        g2.setFont(Sistema.getFontBold(15f));
+        g2.drawString("Tendencia de Ventas por Hora", 20, 28);
+
+        if (data == null || data.isEmpty()) {
+            g2.setColor(new Color(148, 163, 184));
+            g2.setFont(Sistema.getFontRegular(14f));
+            String msg = "Sin ventas en este turno";
+            int mw = g2.getFontMetrics().stringWidth(msg);
+            g2.drawString(msg, (w - mw) / 2, h / 2);
+            g2.dispose();
+            return;
+        }
+
+        int pL = 65, pR = 25, pT = 55, pB = 35;
+        int cW = w - pL - pR, cH = h - pT - pB;
+
+        double maxVal = 0;
+        for (double v : data.values()) if (v > maxVal) maxVal = v;
+        if (maxVal == 0) maxVal = 10000;
+        maxVal = Math.ceil(maxVal / 10000.0) * 10000;
+
+        g2.setFont(Sistema.getFontRegular(10f));
+        for (int i = 0; i <= 4; i++) {
+            int y = pT + cH - (i * cH / 4);
+            double val = i * maxVal / 4;
+            g2.setColor(new Color(71, 85, 105, 60));
+            g2.drawLine(pL, y, pL + cW, y);
+            g2.setColor(new Color(148, 163, 184));
+            String lbl = val == 0 ? "$0" : String.format("$%.0fk", val / 1000.0);
+            g2.drawString(lbl, pL - 55, y + 4);
+        }
+
+        java.util.List<String> keys = new java.util.ArrayList<>(data.keySet());
+        int n = keys.size();
+        int[] xP = new int[n], yP = new int[n];
+        for (int i = 0; i < n; i++) {
+            xP[i] = pL + (n > 1 ? i * cW / (n - 1) : cW / 2);
+            yP[i] = (int) (pT + cH - (data.get(keys.get(i)) * cH / maxVal));
+        }
+
+        g2.setFont(Sistema.getFontRegular(9f));
+        for (int i = 0; i < n; i++) {
+            g2.setColor(new Color(148, 163, 184));
+            String hr = keys.get(i);
+            int lw = g2.getFontMetrics().stringWidth(hr);
+            g2.drawString(hr, xP[i] - lw / 2, pT + cH + 18);
+        }
+
+        if (n > 1) {
+            Path2D.Float curve = new Path2D.Float();
+            curve.moveTo(xP[0], yP[0]);
+            for (int i = 1; i < n; i++) {
+                float cx = (xP[i - 1] + xP[i]) / 2.0f;
+                curve.curveTo(cx, yP[i - 1], cx, yP[i], xP[i], yP[i]);
+            }
+            Path2D.Float area = (Path2D.Float) curve.clone();
+            area.lineTo(xP[n - 1], pT + cH);
+            area.lineTo(xP[0], pT + cH);
+            area.closePath();
+
+            g2.setPaint(new GradientPaint(0, pT, new Color(59, 130, 246, 70), 0, pT + cH, new Color(59, 130, 246, 0)));
+            g2.fill(area);
+
+            g2.setPaint(new GradientPaint(pL, 0, new Color(59, 130, 246), pL + cW, 0, new Color(147, 197, 253)));
+            g2.setStroke(new BasicStroke(3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g2.draw(curve);
+        }
+
+        for (int i = 0; i < n; i++) {
+            g2.setColor(new Color(59, 130, 246));
+            g2.fillOval(xP[i] - 5, yP[i] - 5, 10, 10);
+            g2.setColor(Color.WHITE);
+            g2.fillOval(xP[i] - 2, yP[i] - 2, 4, 4);
+        }
+        g2.dispose();
+    }
+}
+
+// ==================== GRÁFICO: TOP 5 PLATOS MÁS VENDIDOS ====================
+class TopDishesChart extends javax.swing.JPanel {
+    private java.util.List<Object[]> data = new java.util.ArrayList<>();
+
+    TopDishesChart() {
+        setOpaque(false);
+    }
+
+    void setData(java.util.List<Object[]> data) {
+        this.data = data;
+        repaint();
+    }
+
+    @Override
+    protected void paintComponent(java.awt.Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        int w = getWidth(), h = getHeight();
+
+        g2.setColor(new Color(30, 41, 59));
+        g2.fillRoundRect(0, 0, w, h, 16, 16);
+        g2.setColor(new Color(71, 85, 105, 120));
+        g2.drawRoundRect(0, 0, w - 1, h - 1, 16, 16);
+
+        g2.setColor(Color.WHITE);
+        g2.setFont(Sistema.getFontBold(15f));
+        g2.drawString("Top 5 Platos m\u00E1s Vendidos", 20, 28);
+
+        if (data == null || data.isEmpty()) {
+            g2.setColor(new Color(148, 163, 184));
+            g2.setFont(Sistema.getFontRegular(14f));
+            String msg = "Sin datos disponibles";
+            int mw = g2.getFontMetrics().stringWidth(msg);
+            g2.drawString(msg, (w - mw) / 2, h / 2);
+            g2.dispose();
+            return;
+        }
+
+        int startY = 60, barH = 28, gap = 50, labelW = 150, maxBarW = w - labelW - 70;
+        int maxQty = 0;
+        for (Object[] it : data) { int q = (int) it[1]; if (q > maxQty) maxQty = q; }
+        if (maxQty == 0) maxQty = 1;
+
+        Color[][] palette = {
+            {new Color(16, 185, 129), new Color(5, 150, 105)},
+            {new Color(59, 130, 246), new Color(37, 99, 235)},
+            {new Color(245, 158, 11), new Color(217, 119, 6)},
+            {new Color(139, 92, 246), new Color(109, 40, 217)},
+            {new Color(236, 72, 153), new Color(219, 39, 119)}
+        };
+
+        for (int i = 0; i < data.size(); i++) {
+            Object[] it = data.get(i);
+            String name = (String) it[0];
+            int qty = (int) it[1];
+            int y = startY + i * gap;
+
+            g2.setFont(Sistema.getFontRegular(12f));
+            g2.setColor(new Color(226, 232, 240));
+            String disp = name;
+            if (g2.getFontMetrics().stringWidth(disp) > labelW - 10) {
+                while (disp.length() > 0 && g2.getFontMetrics().stringWidth(disp + "..") > labelW - 10)
+                    disp = disp.substring(0, disp.length() - 1);
+                disp += "..";
+            }
+            g2.drawString(disp, 20, y + 19);
+
+            int bW = Math.max(8, qty * maxBarW / maxQty);
+            Color[] c = palette[i % palette.length];
+            g2.setPaint(new GradientPaint(labelW, 0, c[0], labelW + bW, 0, c[1]));
+            g2.fillRoundRect(labelW, y, bW, barH, 8, 8);
+
+            g2.setFont(Sistema.getFontBold(12f));
+            g2.setColor(Color.WHITE);
+            g2.drawString(String.valueOf(qty), labelW + bW + 10, y + 19);
+        }
+        g2.dispose();
+    }
+}
+

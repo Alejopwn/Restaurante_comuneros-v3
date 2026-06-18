@@ -190,6 +190,8 @@ public class PedidosDao {
                 ped.setSala(rs.getString("nombre"));
                 ped.setNum_mesa(rs.getInt("num_mesa"));
                 ped.setTotal(rs.getDouble("total"));
+                ped.setPago_efectivo(rs.getDouble("pago_efectivo"));
+                ped.setPago_transaccion(rs.getDouble("pago_transaccion"));
             }
         } catch (SQLException e) {
             System.out.println(e.toString());
@@ -228,6 +230,7 @@ public class PedidosDao {
         PreparedStatement ps = null;
         ResultSet rs = null;
         String fechaPedido = null, usuario = null, total = null, sala = null, num_mesa = null;
+        double pagoEfectivo = 0.0, pagoTransaccion = 0.0;
         try {
             // Configurar la carpeta oculta
             String appDataPath = System.getenv("APPDATA");
@@ -261,6 +264,8 @@ public class PedidosDao {
                     fechaPedido = new SimpleDateFormat("dd/MM/yyyy HH:mm").format(rs.getTimestamp("fecha"));
                     usuario = rs.getString("usuario");
                     total = rs.getString("total");
+                    pagoEfectivo = rs.getDouble("pago_efectivo");
+                    pagoTransaccion = rs.getDouble("pago_transaccion");
                 } else {
                     System.out.println("⚠️ No se encontró el pedido con ID: " + id_pedido);
                 }
@@ -342,10 +347,16 @@ public class PedidosDao {
 
             doc.add(tabla);
 
+            double cambio = (pagoEfectivo + pagoTransaccion) - Double.parseDouble(total);
+            if (cambio < 0) cambio = 0.0;
+
             // Total
             Paragraph agra = new Paragraph();
             agra.add(Chunk.NEWLINE);
-            agra.add(String.format("Total COP: %.2f", Double.parseDouble(total)));
+            agra.add(String.format("Total Consumo: %.2f COP\n", Double.parseDouble(total)));
+            agra.add(String.format("Pago Efectivo: %.2f COP\n", pagoEfectivo));
+            agra.add(String.format("Pago Transacción: %.2f COP\n", pagoTransaccion));
+            agra.add(String.format("Cambio/Vueltos: %.2f COP\n", cambio));
             agra.setAlignment(2);
             doc.add(agra);
 
@@ -403,6 +414,32 @@ public class PedidosDao {
         } catch (SQLException e) {
             System.out.println(e.toString());
             return false;
+        }
+    }
+
+    public boolean finalizarPedidoConPago(int id_pedido, double pago_efectivo, double pago_transaccion) {
+        Connection con = null;
+        PreparedStatement ps = null;
+        String sql = "UPDATE pedidos SET estado = ?, pago_efectivo = ?, pago_transaccion = ? WHERE id = ?";
+        try {
+            con = cn.getConnection();
+            ps = con.prepareStatement(sql);
+            ps.setString(1, "FINALIZADO");
+            ps.setDouble(2, pago_efectivo);
+            ps.setDouble(3, pago_transaccion);
+            ps.setInt(4, id_pedido);
+            ps.execute();
+            return true;
+        } catch (SQLException e) {
+            System.out.println(e.toString());
+            return false;
+        } finally {
+            try {
+                if (ps != null) ps.close();
+                if (con != null) con.close();
+            } catch (SQLException e) {
+                System.out.println(e.toString());
+            }
         }
     }
 
@@ -512,7 +549,7 @@ public class PedidosDao {
         ResultSet rs = null;
         try {
             con = cn.getConnection();
-            String sql = "SELECT SUM(cantidad * precio) as total FROM detalle_pedidos WHERE id_pedido = ?";
+            String sql = "SELECT SUM(cantidad * precio) as total FROM detalle_pedidos WHERE id_pedido = ? AND nombre NOT IN ('PAGO EFECTIVO', 'PAGO TRANSACCION')";
             ps = con.prepareStatement(sql);
             ps.setInt(1, idPedido);
             rs = ps.executeQuery();
@@ -789,12 +826,11 @@ public class PedidosDao {
         try {
             con = cn.getConnection();
 
-            String sqlPedidos = "SELECT id_sala, SUM(total) AS total FROM pedidos "
+            String sqlPedidos = "SELECT SUM(pago_efectivo) AS efectivo, SUM(pago_transaccion) AS transaccion FROM pedidos "
                     + "WHERE estado = 'FINALIZADO' AND fecha BETWEEN ? AND ?";
             if (idSala != 0) {
                 sqlPedidos += " AND id_sala = ?";
             }
-            sqlPedidos += " GROUP BY id_sala";
             ps = con.prepareStatement(sqlPedidos);
             ps.setString(1, new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(fechaInicio));
             ps.setString(2, new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(fechaFin));
@@ -802,52 +838,13 @@ public class PedidosDao {
                 ps.setInt(3, idSala);
             }
             rs = ps.executeQuery();
+            if (rs.next()) {
+                totalEfectivo = rs.getDouble("efectivo");
+                totalTransaccion = rs.getDouble("transaccion");
+            }
             System.out.println("📊 Procesando totales de pedidos en el rango " + fechaInicio + " a " + fechaFin + (idSala == 0 ? " (todas las salas)" : " (sala " + idSala + ")"));
-            while (rs.next()) {
-                int salaId = rs.getInt("id_sala");
-                double total = rs.getDouble("total");
-                System.out.println("   Sala: " + salaId + ", Total: " + total);
-                if (salaId == 1) {
-                    totalEfectivo += total;
-                    System.out.println("     Agregado a EFECTIVO (Sala 1): " + total);
-                } else if (salaId == 2) {
-                    totalTransaccion += total;
-                    System.out.println("     Agregado a TRANSACCION (Sala 2): " + total);
-                }
-            }
-            rs.close();
-            ps.close();
-
-            if (idSala == 0 || idSala == 3) {
-                String sqlDetalles = "SELECT dp.precio, dp.cantidad, dp.comentario, p.id_sala, p.id AS pedido_id "
-                        + "FROM detalle_pedidos dp "
-                        + "JOIN pedidos p ON dp.id_pedido = p.id "
-                        + "WHERE p.estado = 'FINALIZADO' AND p.fecha BETWEEN ? AND ? AND p.id_sala = 3";
-                ps = con.prepareStatement(sqlDetalles);
-                ps.setString(1, new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(fechaInicio));
-                ps.setString(2, new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(fechaFin));
-                rs = ps.executeQuery();
-                System.out.println("📊 Procesando detalles de pedidos para sala 3 en el rango " + fechaInicio + " a " + fechaFin);
-                while (rs.next()) {
-                    double monto = rs.getDouble("precio") * rs.getInt("cantidad");
-                    String comentario = rs.getString("comentario");
-                    int salaId = rs.getInt("id_sala");
-                    int pedidoId = rs.getInt("pedido_id");
-                    System.out.println("   Pedido ID: " + pedidoId + ", Sala: " + salaId + ", Comentario: " + comentario + ", Monto: " + monto);
-                    if (comentario != null) {
-                        if (comentario.startsWith("EFECTIVO")) {
-                            totalEfectivo += monto;
-                            System.out.println("     Agregado a EFECTIVO (Sala 3): " + monto);
-                        } else if (comentario.startsWith("TRANSACCION")) {
-                            totalTransaccion += monto;
-                            System.out.println("     Agregado a TRANSACCION (Sala 3): " + monto);
-                        }
-                    }
-                }
-            }
-
-            System.out.println("✅ Total Efectivo calculado: COP " + String.format("%.2f", totalEfectivo));
-            System.out.println("✅ Total Transacción calculado: COP " + String.format("%.2f", totalTransaccion));
+            System.out.println("   Total Efectivo: " + totalEfectivo);
+            System.out.println("   Total Transacción: " + totalTransaccion);
         } catch (SQLException e) {
             System.out.println("❌ Error al calcular totales del día: " + e.getMessage());
         } finally {
@@ -929,5 +926,101 @@ public class PedidosDao {
                 System.out.println(e.toString());
             }
         }
+    }
+
+    public java.util.Map<String, Double> obtenerVentasPorHora(String fechaInicio, String fechaFin) {
+        Connection con = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        java.util.Map<String, Double> ventas = new java.util.LinkedHashMap<>();
+        String sql = "SELECT strftime('%H', fecha) AS hora, SUM(total) AS total FROM pedidos WHERE estado = 'FINALIZADO' AND fecha BETWEEN ? AND ? GROUP BY hora ORDER BY hora";
+        try {
+            con = cn.getConnection();
+            ps = con.prepareStatement(sql);
+            ps.setString(1, fechaInicio);
+            ps.setString(2, fechaFin);
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                ventas.put(rs.getString("hora") + ":00", rs.getDouble("total"));
+            }
+        } catch (SQLException e) {
+            System.out.println("Error en obtenerVentasPorHora: " + e.toString());
+        } finally {
+            try {
+                if (rs != null) rs.close();
+                if (ps != null) ps.close();
+                if (con != null) con.close();
+            } catch (SQLException e) {}
+        }
+        return ventas;
+    }
+
+    public java.util.Map<String, Double> obtenerVentasUltimos7Dias() {
+        Connection con = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        java.util.Map<String, Double> ventas = new java.util.LinkedHashMap<>();
+        String sql = "SELECT DATE(fecha) AS dia, SUM(total) AS total FROM pedidos WHERE estado = 'FINALIZADO' GROUP BY dia ORDER BY dia DESC LIMIT 7";
+        try {
+            con = cn.getConnection();
+            ps = con.prepareStatement(sql);
+            rs = ps.executeQuery();
+            java.util.List<String> dias = new java.util.ArrayList<>();
+            java.util.List<Double> totales = new java.util.ArrayList<>();
+            while (rs.next()) {
+                dias.add(rs.getString("dia"));
+                totales.add(rs.getDouble("total"));
+            }
+            for (int i = dias.size() - 1; i >= 0; i--) {
+                ventas.put(dias.get(i), totales.get(i));
+            }
+        } catch (SQLException e) {
+            System.out.println("Error en obtenerVentasUltimos7Dias: " + e.toString());
+        } finally {
+            try {
+                if (rs != null) rs.close();
+                if (ps != null) ps.close();
+                if (con != null) con.close();
+            } catch (SQLException e) {}
+        }
+        return ventas;
+    }
+
+    public java.util.List<Object[]> obtenerPlatosMasVendidos(String fechaInicio, String fechaFin) {
+        Connection con = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        java.util.List<Object[]> lista = new java.util.ArrayList<>();
+        String sql = "SELECT dp.nombre, SUM(dp.cantidad) AS total_vendido FROM detalle_pedidos dp INNER JOIN pedidos p ON dp.id_pedido = p.id WHERE p.estado = 'FINALIZADO' AND p.fecha BETWEEN ? AND ? GROUP BY dp.nombre ORDER BY total_vendido DESC LIMIT 5";
+        try {
+            con = cn.getConnection();
+            ps = con.prepareStatement(sql);
+            ps.setString(1, fechaInicio);
+            ps.setString(2, fechaFin);
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                lista.add(new Object[]{rs.getString("nombre"), rs.getInt("total_vendido")});
+            }
+            rs.close();
+            ps.close();
+
+            if (lista.isEmpty()) {
+                sql = "SELECT dp.nombre, SUM(dp.cantidad) AS total_vendido FROM detalle_pedidos dp INNER JOIN pedidos p ON dp.id_pedido = p.id WHERE p.estado = 'FINALIZADO' AND p.fecha >= datetime('now', '-30 days') GROUP BY dp.nombre ORDER BY total_vendido DESC LIMIT 5";
+                ps = con.prepareStatement(sql);
+                rs = ps.executeQuery();
+                while (rs.next()) {
+                    lista.add(new Object[]{rs.getString("nombre"), rs.getInt("total_vendido")});
+                }
+            }
+        } catch (SQLException e) {
+            System.out.println("Error en obtenerPlatosMasVendidos: " + e.toString());
+        } finally {
+            try {
+                if (rs != null) rs.close();
+                if (ps != null) ps.close();
+                if (con != null) con.close();
+            } catch (SQLException e) {}
+        }
+        return lista;
     }
 }

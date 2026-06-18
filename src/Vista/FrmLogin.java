@@ -112,14 +112,14 @@ public class FrmLogin extends javax.swing.JFrame {
         panelLeft.add(lblSubtitle);
 
         JLabel lblCopyright = new JLabel("\u00a9 2025 alejopwn. Todos los derechos reservados.");
-        lblCopyright.setFont(Sistema.getFontRegular(9f));
+        lblCopyright.setFont(Sistema.getFontRegular(11f));
         lblCopyright.setForeground(new Color(80, 120, 180));
         lblCopyright.setHorizontalAlignment(SwingConstants.CENTER);
         lblCopyright.setBounds(0, 395, 290, 20);
         panelLeft.add(lblCopyright);
 
         JLabel lblVersion = new JLabel("Versión " + Modelo.AutoUpdater.CURRENT_VERSION);
-        lblVersion.setFont(Sistema.getFontRegular(9f));
+        lblVersion.setFont(Sistema.getFontRegular(11f));
         lblVersion.setForeground(new Color(100, 140, 200));
         lblVersion.setHorizontalAlignment(SwingConstants.CENTER);
         lblVersion.setBounds(0, 415, 290, 20);

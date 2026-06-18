@@ -5,68 +5,29 @@ echo     GENERANDO APLICACION PORTABLE PARA WINDOWS (.EXE)
 echo =======================================================
 echo.
 
-:: Verificar si Java está instalado y en el PATH
-java -version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [ERROR] No se encontro Java instalado o no esta en las variables de entorno (PATH).
-    echo Por favor, instale JDK 17 o superior y asegurese de agregarlo al PATH.
-    pause
-    exit /b
-)
-
-:: Verificar si jpackage está disponible
-jpackage --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [ERROR] No se encontro la herramienta 'jpackage'. 
-    echo Asegurese de estar usando un JDK completo (version 17 o superior) y que este en el PATH.
-    pause
-    exit /b
-)
-
-echo [+] Preparando carpeta temporal de empaquetado...
+echo [+] Limpiando directorios anteriores...
 if exist package-temp rd /s /q package-temp
-mkdir package-temp
-
-:: Copiar el JAR principal
-if not exist dist\Restaurante_comuneros.jar (
-    echo [ERROR] No se encontro 'dist\Restaurante_comuneros.jar'. 
-    echo Compile el proyecto primero en NetBeans o ejecute 'ant jar'.
-    rd /s /q package-temp
-    pause
-    exit /b
-)
-copy dist\Restaurante_comuneros.jar package-temp\ > nul
-
-:: Copiar todas las librerias de dependencia
-if exist librerias (
-    copy librerias\*.jar package-temp\ > nul
-)
-
-echo [+] Compilando aplicacion nativa de Windows con JRE integrado...
 if exist Comuneros-POS rd /s /q Comuneros-POS
 
-jpackage --type app-image ^
-         --name "Comuneros" ^
-         --input package-temp ^
-         --main-jar Restaurante_comuneros.jar ^
-         --main-class restaurante.Restaurante ^
-         --dest Comuneros-POS ^
-         --win-console
+echo [+] Preparando carpeta temporal de empaquetado...
+mkdir package-temp
 
-if %errorlevel% equ 0 (
-    echo.
-    echo =======================================================
-    echo  [OK] ¡APLICACION GENERADA CON EXITO!
-    echo =======================================================
-    echo  Busque la carpeta 'Comuneros-POS\Comuneros'
-    echo  Ahi dentro encontrara 'Comuneros.exe'.
-    echo  Puede copiar esa carpeta a cualquier PC con Windows.
-    echo =======================================================
-) else (
-    echo.
-    echo [ERROR] Hubo un fallo al empaquetar con jpackage.
-)
+echo [+] Copiando JAR principal...
+copy dist\Restaurante_comuneros.jar package-temp\
 
-:: Limpiar archivos temporales
+echo [+] Copiando librerias de dependencia...
+copy librerias\*.jar package-temp\
+
+echo [+] Compilando aplicacion nativa con JRE integrado...
+jpackage --type app-image --name "Comuneros" --input package-temp --main-jar Restaurante_comuneros.jar --main-class restaurante.Restaurante --dest Comuneros-POS --win-console
+
+echo.
+echo =======================================================
+echo  [OK] Proceso de empaquetado finalizado.
+echo  Busque la carpeta 'Comuneros-POS\Comuneros'
+echo  Ahi dentro encontrara 'Comuneros.exe'.
+echo =======================================================
+echo.
+
 rd /s /q package-temp
 pause

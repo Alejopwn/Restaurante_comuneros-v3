@@ -6,7 +6,7 @@ import java.net.URL;
 
 public class AutoUpdater {
 
-    public static final String CURRENT_VERSION = "1.1.5";
+    public static final String CURRENT_VERSION = "1.1.6";
     private static final String VERSION_URL = "https://raw.githubusercontent.com/Alejopwn/Restaurante_comuneros-v3/main/version.txt";
 
     public interface UpdateProgressCallback {
@@ -91,7 +91,31 @@ public class AutoUpdater {
 
             if (isNewerVersion(CURRENT_VERSION, remoteVersion)) {
                 if (callback != null) callback.onProgress("¡Actualización encontrada (" + remoteVersion + ")!", 30);
-                
+
+                // Preguntar al usuario si desea actualizar
+                final String versionToShow = remoteVersion;
+                final boolean[] acceptUpdate = new boolean[1];
+                try {
+                    javax.swing.SwingUtilities.invokeAndWait(() -> {
+                        int option = javax.swing.JOptionPane.showConfirmDialog(
+                            null,
+                            "Hay una nueva versión disponible (" + versionToShow + ").\n¿Desea descargarla e instalarla ahora?",
+                            "Actualización disponible",
+                            javax.swing.JOptionPane.YES_NO_OPTION,
+                            javax.swing.JOptionPane.INFORMATION_MESSAGE
+                        );
+                        acceptUpdate[0] = (option == javax.swing.JOptionPane.YES_OPTION);
+                    });
+                } catch (Exception e) {
+                    acceptUpdate[0] = false;
+                }
+
+                if (!acceptUpdate[0]) {
+                    System.out.println("⏭️ El usuario rechazó la actualización.");
+                    if (callback != null) callback.onProgress("Actualización omitida.", 0);
+                    return false;
+                }
+
                 // Descargar en ruta ABSOLUTA dentro de la carpeta de la app
                 File tempJar = new File(workDir, "update.tmp");
                 System.out.println("📥 Descargando en: " + tempJar.getAbsolutePath());

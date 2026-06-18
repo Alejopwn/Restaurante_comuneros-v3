@@ -164,43 +164,41 @@ public class AutoUpdater {
         String os = System.getProperty("os.name").toLowerCase();
         boolean isPackaged = appRoot != null;
         File workDir = isPackaged ? appRoot : new File(".");
-        String appRootPath = workDir.getAbsolutePath();
 
-        System.out.println("🔍 Ruta raíz del instalador: " + appRootPath);
+        System.out.println("🔍 Ruta raíz del instalador: " + workDir.getAbsolutePath());
         System.out.println("🔍 Archivo temporal: " + tempJar.getAbsolutePath());
 
         try {
-                // Usar VBScript en vez de .bat para mayor fiabilidad en Windows
+            if (os.contains("win")) {
+                // --- Windows: usar VBScript (más fiable que .bat para abrir procesos) ---
                 File vbsFile = new File(workDir, "update.vbs");
                 File logFile = new File(workDir, "update_log.txt");
-                String jarDest, exePath;
 
+                String jarDest, exePath;
                 if (isPackaged) {
                     jarDest = new File(appRoot, "app\\Restaurante_comuneros.jar").getAbsolutePath();
-                    exePath  = new File(appRoot, "Comuneros.exe").getAbsolutePath();
+                    exePath = new File(appRoot, "Comuneros.exe").getAbsolutePath();
                 } else {
                     jarDest = new File(workDir, "dist\\Restaurante_comuneros.jar").getAbsolutePath();
-                    exePath  = ""; // modo dev: no hay .exe
+                    exePath = "";
                 }
 
                 PrintWriter writer = new PrintWriter(new FileWriter(vbsFile));
-                writer.println("' Script de actualizacion automatica - Comuneros POS");
+                writer.println("' Actualizador automatico - Comuneros POS");
                 writer.println("WScript.Sleep 5000");
                 writer.println("Dim fso, shell");
                 writer.println("Set fso   = CreateObject(\"Scripting.FileSystemObject\")");
                 writer.println("Set shell = CreateObject(\"WScript.Shell\")");
-                writer.println("Dim log : log = \"" + logFile.getAbsolutePath() + "\"");
-                writer.println("Dim tmp : tmp = \"" + tempJar.getAbsolutePath() + "\"");
-                writer.println("Dim dst : dst = \"" + jarDest + "\"");
                 writer.println("On Error Resume Next");
-                writer.println("fso.CopyFile tmp, dst, True");
+                writer.println("fso.CopyFile \"" + tempJar.getAbsolutePath() + "\", \"" + jarDest + "\", True");
                 writer.println("If Err.Number <> 0 Then");
-                writer.println("  shell.Run \"cmd /c echo [ERROR] \" & Err.Description & \" >> \" & Chr(34) & log & Chr(34), 0, False");
+                writer.println("  Dim logErr : Open \"" + logFile.getAbsolutePath() + "\" For Append As #1");
+                writer.println("  Print #1, \"[ERROR] \" & Err.Description");
+                writer.println("  Close #1");
                 writer.println("Else");
-                writer.println("  fso.DeleteFile tmp");
-                writer.println("  shell.Run \"cmd /c echo [OK] JAR reemplazado >> \" & Chr(34) & log & Chr(34), 0, False");
+                writer.println("  fso.DeleteFile \"" + tempJar.getAbsolutePath() + "\"");
                 if (isPackaged) {
-                    writer.println("  shell.Run Chr(34) & \"" + exePath + "\" & Chr(34), 1, False");
+                    writer.println("  shell.Run \"\\\"" + exePath + "\"\\\"\", 1, False");
                 } else {
                     writer.println("  shell.Run \"java -cp dist\\\\Restaurante_comuneros.jar;librerias\\\\* restaurante.Restaurante\", 1, False");
                 }
@@ -208,28 +206,32 @@ public class AutoUpdater {
                 writer.println("fso.DeleteFile WScript.ScriptFullName");
                 writer.close();
 
-                // Lanzar el VBScript con wscript.exe (sin ventana de consola)
-                Runtime.getRuntime().exec(new String[]{
-                    "wscript.exe", "//Nologo", vbsFile.getAbsolutePath()
-                });
+                Runtime.getRuntime().exec(new String[]{"wscript.exe", "//Nologo", vbsFile.getAbsolutePath()});
+
             } else {
+                // --- Linux/macOS: usar script .sh ---
                 File shFile = new File(workDir, "update.sh");
                 File logFile = new File(workDir, "update_log.txt");
+
+                String jarDest, exePath;
+                if (isPackaged) {
+                    jarDest = new File(appRoot, "app/Restaurante_comuneros.jar").getAbsolutePath();
+                    exePath = new File(appRoot, "Comuneros").getAbsolutePath();
+                } else {
+                    jarDest = "dist/Restaurante_comuneros.jar";
+                    exePath = "";
+                }
+
                 PrintWriter writer = new PrintWriter(new FileWriter(shFile));
                 writer.println("#!/bin/sh");
                 writer.println("echo \"[LOG] Iniciando actualizacion...\" > \"" + logFile.getAbsolutePath() + "\"");
                 writer.println("sleep 4");
-
+                writer.println("mv \"" + tempJar.getAbsolutePath() + "\" \"" + jarDest + "\" >> \"" + logFile.getAbsolutePath() + "\" 2>&1");
                 if (isPackaged) {
-                    String jarDest = new File(appRoot, "app/Restaurante_comuneros.jar").getAbsolutePath();
-                    String exePath = new File(appRoot, "Comuneros").getAbsolutePath();
-                    writer.println("mv \"" + tempJar.getAbsolutePath() + "\" \"" + jarDest + "\" >> \"" + logFile.getAbsolutePath() + "\" 2>&1");
                     writer.println("\"" + exePath + "\" &");
                 } else {
-                    writer.println("mv \"" + tempJar.getAbsolutePath() + "\" dist/Restaurante_comuneros.jar >> \"" + logFile.getAbsolutePath() + "\" 2>&1");
                     writer.println("java -cp \"dist/Restaurante_comuneros.jar:librerias/*\" restaurante.Restaurante &");
                 }
-
                 writer.println("rm -- \"$0\"");
                 writer.close();
                 shFile.setExecutable(true);
@@ -239,9 +241,8 @@ public class AutoUpdater {
 
             System.out.println("🔄 Script lanzado. Cerrando JVM...");
         } catch (Exception e) {
-            System.out.println("❌ Error al lanzar el actualizador externo: " + e.getMessage());
+            System.out.println("❌ Error al lanzar el actualizador: " + e.getMessage());
         } finally {
-            // Siempre cerrar la JVM para liberar el bloqueo del JAR
             System.exit(0);
         }
     }

@@ -5,8 +5,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Locale;
 import javax.print.Doc;
 import javax.print.DocFlavor;
 import javax.print.DocPrintJob;
@@ -31,13 +34,18 @@ public class ImpresionTicket {
     private Conexion cn = new Conexion();
     private PedidosDao pedidosDao = new PedidosDao();
 
-    // Método para formatear valores monetarios sin decimales si son enteros
+    // Método para formatear valores monetarios sin decimales si son enteros, con separador de miles
     private String formatearMoneda(double valor) {
+        DecimalFormatSymbols symbols = new DecimalFormatSymbols(new Locale("es", "CO"));
+        symbols.setDecimalSeparator(',');
+        symbols.setGroupingSeparator('.');
+        DecimalFormat df;
         if (valor == (long) valor) {
-            return String.format("COP %d", (long) valor); // Sin decimales si es entero
+            df = new DecimalFormat("$#,##0", symbols);
         } else {
-            return String.format("COP %.2f", valor); // Con dos decimales si no es entero
+            df = new DecimalFormat("$#,##0.00", symbols);
         }
+        return df.format(valor);
     }
 
     public void datosRestaurante() {
@@ -95,11 +103,11 @@ public class ImpresionTicket {
             double totalGeneral = 0.0;
 
             // ENCABEZADO
-            sb.append(String.format("%s\n", centrarTexto(nombreRestaurante, 32)));
+            sb.append(String.format("%s\n", centrarTexto(nombreRestaurante, 29)));
             sb.append(String.format("NIT: %s\n", rucRestaurante));
             sb.append(String.format("Tel: %s\n", telefonoRestaurante));
-            sb.append(String.format("Dir: %s\n", cortar(direccionRestaurante, 32)));
-            sb.append(String.format("Sala: %s\n", cortar(sala, 32)));
+            sb.append(String.format("Dir: %s\n", cortar(direccionRestaurante, 29)));
+            sb.append(String.format("Sala: %s\n", cortar(sala, 29)));
             sb.append(String.format("Mesa: %d\n", numMesa));
             sb.append("-----------------------------\n");
             sb.append(String.format("Factura: %04d\n", idPedido));
@@ -107,7 +115,7 @@ public class ImpresionTicket {
             sb.append("-----------------------------\n");
 
             // PRODUCTOS
-            sb.append("Cant  Descripción          Total\n");
+            sb.append("C. Descripción         Total\n");
             for (int i = 0; i < tableFinalizar.getRowCount(); i++) {
                 // Convertir la cantidad a entero
                 int cantidad;
@@ -127,26 +135,30 @@ public class ImpresionTicket {
                 String total = tableFinalizar.getValueAt(i, 4).toString();
                 double totalItem = Double.parseDouble(total);
                 totalGeneral += totalItem;
-                sb.append(String.format("%-5d %-18s %6s\n", cantidad, cortar(producto, 18), formatearMoneda(totalItem)));
+                // Formatear: Cantidad(2 chars), espacio(1 char), Producto(16 chars), espacio(1 char), Precio(9 chars de ancho derecho)
+                // Ancho total: 2 + 1 + 16 + 1 + 9 = 29
+                sb.append(String.format("%-2d %-16s %9s\n", cantidad, cortar(producto, 16), formatearMoneda(totalItem)));
                 // Imprimir comentario si existe
                 Object comentarioObj = tableFinalizar.getValueAt(i, 5);
                 if (comentarioObj != null && !comentarioObj.toString().trim().isEmpty()) {
-                    sb.append(String.format("  >> %s\n", cortar(comentarioObj.toString().trim(), 28)));
+                    sb.append(String.format("  >> %s\n", cortar(comentarioObj.toString().trim(), 25)));
                 }
             }
             sb.append("-----------------------------\n");
 
             // TOTAL
-            sb.append(String.format("TOTAL CONSUMO:      %s\n", formatearMoneda(totalGeneral)));
-            sb.append(String.format("PAGO EFECTIVO:      %s\n", formatearMoneda(pagoEfectivo)));
-            sb.append(String.format("PAGO TRANSFERENCIA: %s\n", formatearMoneda(pagoTransaccion)));
+            // Formatear líneas de totales: etiqueta(16 chars), espacio(1 char), precio(12 chars de ancho derecho)
+            // Ancho total: 16 + 1 + 12 = 29
+            sb.append(String.format("%-16s %12s\n", "TOTAL CONSUMO:", formatearMoneda(totalGeneral)));
+            sb.append(String.format("%-16s %12s\n", "PAGO EFECTIVO:", formatearMoneda(pagoEfectivo)));
+            sb.append(String.format("%-16s %12s\n", "PAGO TRANSF.:", formatearMoneda(pagoTransaccion)));
             double cambio = (pagoEfectivo + pagoTransaccion) - totalGeneral;
             if (cambio < 0) cambio = 0.0;
-            sb.append(String.format("CAMBIO / VUELTOS:   %s\n", formatearMoneda(cambio)));
+            sb.append(String.format("%-16s %12s\n", "CAMBIO/VUELTOS:", formatearMoneda(cambio)));
             sb.append("-----------------------------\n");
 
             // MENSAJE
-            sb.append("\n").append(cortar(mensajeRestaurante, 32)).append("\n");
+            sb.append("\n").append(cortar(mensajeRestaurante, 29)).append("\n");
             sb.append("-----------------------------\n");
             sb.append("¡Gracias por su visita!\n\n");
 

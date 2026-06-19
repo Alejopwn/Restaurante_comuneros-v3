@@ -1,2 +1,2 @@
-1.1.10
+1.1.11
 https://github.com/Alejopwn/Restaurante_comuneros-v3/raw/main/dist/Restaurante_comuneros.jar

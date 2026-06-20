@@ -1094,11 +1094,11 @@ public final class Sistema extends javax.swing.JFrame {
         TablePedidos.setModel(new javax.swing.table.DefaultTableModel(
                 new Object[][]{},
                 new String[]{
-                    "Id", "Sala", "Atendido", "N° Mesa", "Fecha", "Total", "Estado"
+                    "Id", "Sala", "Atendido", "N° Mesa", "Fecha", "Total", "Estado", "PagoEfectivo", "PagoTransaccion"
                 }
         ) {
             boolean[] canEdit = new boolean[]{
-                false, false, false, false, false, false, true
+                false, false, false, false, false, false, true, false, false
             };
 
             public boolean isCellEditable(int rowIndex, int columnIndex) {
@@ -3128,7 +3128,7 @@ public final class Sistema extends javax.swing.JFrame {
                     modelo = (DefaultTableModel) TablePedidos.getModel();
                     modelo.setRowCount(0);
                     txtPedidosDia.setText(String.valueOf(Listar.size()));
-                    Object[] ob = new Object[7];
+                    Object[] ob = new Object[9];
                     for (int i = 0; i < Listar.size(); i++) {
                         ob[0] = Listar.get(i).getId();
                         ob[1] = Listar.get(i).getSala();
@@ -3137,9 +3137,18 @@ public final class Sistema extends javax.swing.JFrame {
                         ob[4] = Listar.get(i).getFecha();
                         ob[5] = String.format("%.2f", Listar.get(i).getTotal());
                         ob[6] = Listar.get(i).getEstado();
+                        ob[7] = Listar.get(i).getPago_efectivo();
+                        ob[8] = Listar.get(i).getPago_transaccion();
                         modelo.addRow(ob);
                         System.out.println("Pedido " + i + ": Fecha = " + ob[4] + ", Total = " + ob[5]);
                     }
+                    // Ocultar columnas auxiliares de pago (col 7 y 8)
+                    TablePedidos.getColumnModel().getColumn(7).setMinWidth(0);
+                    TablePedidos.getColumnModel().getColumn(7).setMaxWidth(0);
+                    TablePedidos.getColumnModel().getColumn(7).setWidth(0);
+                    TablePedidos.getColumnModel().getColumn(8).setMinWidth(0);
+                    TablePedidos.getColumnModel().getColumn(8).setMaxWidth(0);
+                    TablePedidos.getColumnModel().getColumn(8).setWidth(0);
                     colorHeader(TablePedidos);
                     TablePedidos.setDefaultRenderer(Object.class, color);
                     // Actualizar totales DESPUÉS de que la conexión anterior ya fue liberada
@@ -3934,10 +3943,19 @@ public final class Sistema extends javax.swing.JFrame {
                 ped.getNum_mesa(),
                 ped.getFecha(),
                 String.format("%.2f", ped.getTotal()),
-                ped.getEstado()
+                ped.getEstado(),
+                ped.getPago_efectivo(),
+                ped.getPago_transaccion()
             });
             System.out.println("Pedido ID: " + ped.getId() + ", Fecha: " + ped.getFecha());
         }
+        // Ocultar columnas auxiliares de pago
+        TablePedidos.getColumnModel().getColumn(7).setMinWidth(0);
+        TablePedidos.getColumnModel().getColumn(7).setMaxWidth(0);
+        TablePedidos.getColumnModel().getColumn(7).setWidth(0);
+        TablePedidos.getColumnModel().getColumn(8).setMinWidth(0);
+        TablePedidos.getColumnModel().getColumn(8).setMaxWidth(0);
+        TablePedidos.getColumnModel().getColumn(8).setWidth(0);
     }
 
     // En Sistema.java

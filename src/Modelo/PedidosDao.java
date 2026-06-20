@@ -794,7 +794,7 @@ public class PedidosDao {
         PreparedStatement ps = null;
         ResultSet rs = null;
         List lista = new ArrayList();
-        String sql = "SELECT p.id, s.nombre AS sala, p.num_mesa, p.fecha, p.total, p.usuario, p.estado "
+        String sql = "SELECT p.id, s.nombre AS sala, p.num_mesa, p.fecha, p.total, p.usuario, p.estado, p.pago_efectivo, p.pago_transaccion "
                 + "FROM pedidos p INNER JOIN salas s ON p.id_sala = s.id "
                 + "WHERE p.fecha BETWEEN ? AND ? AND p.estado IN ('FINALIZADO', 'PENDIENTE') ORDER BY p.fecha";
         try {
@@ -812,6 +812,8 @@ public class PedidosDao {
                 ped.setTotal(rs.getDouble("total"));
                 ped.setUsuario(rs.getString("usuario"));
                 ped.setEstado(rs.getString("estado"));
+                ped.setPago_efectivo(rs.getDouble("pago_efectivo"));
+                ped.setPago_transaccion(rs.getDouble("pago_transaccion"));
                 lista.add(ped);
             }
         } catch (SQLException e) {

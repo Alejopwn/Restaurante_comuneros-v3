@@ -24,7 +24,15 @@ public class Tables extends DefaultTableCellRenderer {
         }
 
         String estado = jtable.getValueAt(row, 6).toString();
-        String sala = jtable.getValueAt(row, 1).toString();
+        double pagoEfectivo = 0.0;
+        double pagoTransaccion = 0.0;
+        try {
+            int colCount = jtable.getModel().getColumnCount();
+            if (colCount > 7 && jtable.getModel().getValueAt(row, 7) != null)
+                pagoEfectivo = Double.parseDouble(jtable.getModel().getValueAt(row, 7).toString());
+            if (colCount > 8 && jtable.getModel().getValueAt(row, 8) != null)
+                pagoTransaccion = Double.parseDouble(jtable.getModel().getValueAt(row, 8).toString());
+        } catch (NumberFormatException ignored) {}
 
         if (row == hoverRow) {
             this.setBackground(new Color(51, 65, 85)); // Hover (Slate 700)
@@ -32,19 +40,24 @@ public class Tables extends DefaultTableCellRenderer {
         } else if (estado.equals("PENDIENTE")) {
             this.setBackground(new Color(120, 80, 20)); // Naranja oscuro
             this.setForeground(new Color(253, 224, 171)); // Texto naranja claro
-        } else if (estado.equals("FINALIZADO") && sala.equalsIgnoreCase("TRANSACCIONES")) {
-            this.setBackground(new Color(100, 90, 30)); // Amarillo oscuro
-            this.setForeground(new Color(253, 243, 180)); // Texto amarillo claro
-        } else if (estado.equals("FINALIZADO") && sala.equalsIgnoreCase("EFECTIVO-TRANSACCION")) {
-            this.setBackground(new Color(30, 58, 95)); // Azul oscuro
-            this.setForeground(new Color(170, 210, 245)); // Texto azul claro
         } else if (estado.equals("FINALIZADO")) {
-            if (row % 2 == 0) {
-                this.setBackground(new Color(30, 41, 59)); // Cebra par (Slate 800)
+            if (pagoEfectivo > 0 && pagoTransaccion > 0) {
+                this.setBackground(new Color(88, 28, 135)); // Morado (Mixto)
+                this.setForeground(new Color(233, 213, 255));
+            } else if (pagoEfectivo > 0) {
+                this.setBackground(new Color(20, 83, 45)); // Verde (Efectivo)
+                this.setForeground(new Color(187, 247, 208));
+            } else if (pagoTransaccion > 0) {
+                this.setBackground(new Color(30, 58, 138)); // Azul (Transferencia)
+                this.setForeground(new Color(191, 219, 254));
             } else {
-                this.setBackground(new Color(15, 23, 42)); // Cebra impar (Slate 900)
+                if (row % 2 == 0) {
+                    this.setBackground(new Color(30, 41, 59));
+                } else {
+                    this.setBackground(new Color(15, 23, 42));
+                }
+                this.setForeground(textColor);
             }
-            this.setForeground(textColor);
         } else {
             if (row % 2 == 0) {
                 this.setBackground(new Color(30, 41, 59)); // Cebra par (Slate 800)
